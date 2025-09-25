@@ -1,14 +1,15 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex, RwLock};
 
 use axum::{
-    extract::{Query, State},
+    extract::State,
+    http::Request,
+    middleware::{self, Next},
     response::Html,
     routing::get,
     Json, Router,
 };
+use lazy_static::lazy_static;
+use leptos::*;
 use tower_http::trace::TraceLayer;
 
 use futures::{channel::oneshot, AsyncRead, AsyncWrite};
@@ -17,13 +18,11 @@ use futures_rustls::{
     rustls::{server::WebPkiClientVerifier, RootCertStore, ServerConfig},
     TlsAcceptor,
 };
-use hyper::{
-    body::{Bytes, Incoming},
-    server::conn::http1,
-    Request, StatusCode,
-};
+use hyper::{body::Incoming, server::conn::http1, StatusCode};
 use hyper_util::rt::TokioIo;
 
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tower_service::Service;
@@ -36,19 +35,50 @@ use tracing::info;
 
 pub const DEFAULT_FIXTURE_PORT: u16 = 3000;
 
+// Global log storage that persists across all TLS connections
+lazy_static! {
+    static ref GLOBAL_LOGS: Arc<RwLock<Vec<LogEntry>>> = Arc::new(RwLock::new(Vec::new()));
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LogEntry {
+    pub timestamp: DateTime<Utc>,
+    pub message: String,
+}
+
 struct AppState {
     shutdown: Option<oneshot::Sender<()>>,
 }
 
+// Helper function to add logs to global storage
+fn add_to_global_log(message: String) {
+    let entry = LogEntry {
+        timestamp: Utc::now(),
+        message,
+    };
+
+    let mut logs = GLOBAL_LOGS.write().unwrap();
+    logs.push(entry);
+
+    // Keep only the last 50 entries to avoid unbounded memory growth
+    if logs.len() > 50 {
+        let len = logs.len();
+        logs.drain(0..len - 50);
+    }
+}
+
 fn app(state: AppState) -> Router {
+    let state_arc = Arc::new(Mutex::new(state));
+
     Router::new()
-        .route("/", get(|| async { "Hello, World!" }))
-        .route("/bytes", get(bytes))
-        .route("/formats/json", get(json))
-        .route("/formats/html", get(html))
-        .route("/protected", get(protected_route))
+        .route("/", get(dashboard_handler))
+        .route("/balances", get(balances_route))
+        .layer(middleware::from_fn_with_state(
+            state_arc.clone(),
+            access_log_middleware,
+        ))
         .layer(TraceLayer::new_for_http())
-        .with_state(Arc::new(Mutex::new(state)))
+        .with_state(state_arc)
 }
 
 /// Bind the server to the given socket.
@@ -97,22 +127,40 @@ pub async fn bind<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
     Ok(())
 }
 
-async fn bytes(
-    State(state): State<Arc<Mutex<AppState>>>,
-    Query(params): Query<HashMap<String, String>>,
-) -> Result<Bytes, StatusCode> {
-    info!("Handling /bytes with params: {:?}", params);
+async fn access_log_middleware(
+    State(_state): State<Arc<Mutex<AppState>>>,
+    req: Request<axum::body::Body>,
+    next: Next,
+) -> axum::response::Response {
+    // Only log requests to /balances
+    if req.uri().path() == "/balances" {
+        // Since we're using custom TLS transport, we'll use a placeholder IP
+        let ip = "unknown".to_string();
 
-    let size = params
-        .get("size")
-        .and_then(|size| size.parse::<usize>().ok())
-        .unwrap_or(1);
+        // Check authorization header
+        let expected_token = "random_auth_token";
+        let is_authorized = req
+            .headers()
+            .get("authorization")
+            .and_then(|value| value.to_str().ok())
+            .map(|auth_token| {
+                let token = auth_token.trim_start_matches("Bearer ");
+                token == expected_token
+            })
+            .unwrap_or(false);
 
-    if params.contains_key("shutdown") {
-        _ = state.lock().unwrap().shutdown.take().unwrap().send(());
+        let message = if is_authorized {
+            format!("✅ Authorized access to /balances from {}", ip)
+        } else {
+            format!("❌ Unauthorized access attempt to /balances from {}", ip)
+        };
+
+        // Log to console and to our global in-memory log
+        info!("{}", message);
+        add_to_global_log(message);
     }
 
-    Ok(Bytes::from(vec![0x42u8; size]))
+    next.run(req).await
 }
 
 /// parse the JSON data from the file content
@@ -121,42 +169,6 @@ fn get_json_value(filecontent: &str) -> Result<Json<Value>, StatusCode> {
         eprintln!("Failed to parse JSON data: {e}");
         StatusCode::INTERNAL_SERVER_ERROR
     })?))
-}
-
-async fn json(
-    State(state): State<Arc<Mutex<AppState>>>,
-    Query(params): Query<HashMap<String, String>>,
-) -> Result<Json<Value>, StatusCode> {
-    info!("Handling /json with params: {:?}", params);
-
-    let size = params
-        .get("size")
-        .and_then(|size| size.parse::<usize>().ok())
-        .unwrap_or(1);
-
-    if params.contains_key("shutdown") {
-        _ = state.lock().unwrap().shutdown.take().unwrap().send(());
-    }
-
-    match size {
-        1 => get_json_value(include_str!("data/1kb.json")),
-        4 => get_json_value(include_str!("data/4kb.json")),
-        8 => get_json_value(include_str!("data/8kb.json")),
-        _ => Err(StatusCode::NOT_FOUND),
-    }
-}
-
-async fn html(
-    State(state): State<Arc<Mutex<AppState>>>,
-    Query(params): Query<HashMap<String, String>>,
-) -> Html<&'static str> {
-    info!("Handling /html with params: {:?}", params);
-
-    if params.contains_key("shutdown") {
-        _ = state.lock().unwrap().shutdown.take().unwrap().send(());
-    }
-
-    Html(include_str!("data/4kb.html"))
 }
 
 struct AuthenticatedUser;
@@ -190,64 +202,230 @@ where
     }
 }
 
-async fn protected_route(_: AuthenticatedUser) -> Result<Json<Value>, StatusCode> {
-    info!("Handling /protected");
-
-    get_json_value(include_str!("data/protected_data.json"))
+async fn balances_route(_: AuthenticatedUser) -> Result<Json<Value>, StatusCode> {
+    get_json_value(include_str!("data/balances.json"))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use axum::{
-        body::Body,
-        http::{self, Request, StatusCode},
-    };
-    use http_body_util::BodyExt;
-    use serde_json::Value;
-    use tower::ServiceExt;
+async fn dashboard_handler() -> Html<String> {
+    let app_html = leptos::ssr::render_to_string(App);
+    Html(app_html.to_string())
+}
 
-    fn get_app() -> Router {
-        let (sender, _) = oneshot::channel();
-        let state = AppState {
-            shutdown: Some(sender),
-        };
-        app(state)
+#[component]
+pub fn App() -> impl IntoView {
+    view! {
+        <html lang="en">
+            <head>
+                <meta charset="utf-8"/>
+                <meta name="viewport" content="width=device-width, initial-scale=1"/>
+                <title>"Swiss Bank Demo"</title>
+                <style>
+                    "
+                    body {
+                        font-family: Arial, sans-serif;
+                        margin: 0;
+                        padding: 20px;
+                        background: white;
+                        color: black;
+                        font-size: 18px;
+                        line-height: 1.6;
+                    }
+                    .container {
+                        max-width: 1200px;
+                        margin: 0 auto;
+                    }
+                    .header {
+                        text-align: center;
+                        margin-bottom: 40px;
+                        padding: 30px;
+                        border-bottom: 3px solid #333;
+                    }
+                    .header h1 {
+                        font-size: 4rem;
+                        margin: 0 0 20px 0;
+                        color: #2c5aa0;
+                    }
+                    .header p {
+                        font-size: 1.5rem;
+                        margin: 0;
+                        color: #666;
+                    }
+                    .section {
+                        margin: 40px 0;
+                        padding: 30px;
+                        border: 2px solid #ddd;
+                        border-radius: 10px;
+                    }
+                    .section h2 {
+                        font-size: 2.5rem;
+                        margin-top: 0;
+                        color: #333;
+                        border-bottom: 2px solid #333;
+                        padding-bottom: 10px;
+                    }
+                    .balances-table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        font-size: 1.5rem;
+                        margin: 20px 0;
+                    }
+                    .balances-table th,
+                    .balances-table td {
+                        padding: 15px;
+                        text-align: left;
+                        border-bottom: 2px solid #ddd;
+                    }
+                    .balances-table th {
+                        background-color: #f8f9fa;
+                        font-weight: bold;
+                    }
+                    .log-table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        font-size: 1.2rem;
+                    }
+                    .log-table th,
+                    .log-table td {
+                        padding: 12px;
+                        text-align: left;
+                        border-bottom: 1px solid #ddd;
+                    }
+                    .log-table th {
+                        background-color: #f8f9fa;
+                        font-weight: bold;
+                        font-size: 1.3rem;
+                    }
+                    .log-table tbody tr:nth-child(even) {
+                        background-color: #f8f9fa;
+                    }
+                    .status-authorized {
+                        color: #28a745;
+                        font-weight: bold;
+                    }
+                    .status-unauthorized {
+                        color: #dc3545;
+                        font-weight: bold;
+                    }
+                    .footer {
+                        text-align: center;
+                        margin-top: 40px;
+                        padding: 20px;
+                        background-color: #f8f9fa;
+                        border-radius: 10px;
+                        font-size: 1.3rem;
+                    }
+                    .footer code {
+                        background: #e9ecef;
+                        padding: 5px 10px;
+                        border-radius: 5px;
+                        font-family: monospace;
+                    }
+                    "
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1>"Swiss Bank Demo"</h1>
+                        <p>"This server holds EF's (fake) reserves. Only the Verifier has access. Visitors can try, but will see \"unauthorized.\""</p>
+                    </div>
+
+                    <div class="section">
+                        <h2>"Bank Reserves"</h2>
+                        <table class="balances-table">
+                            <thead>
+                                <tr>
+                                    <th>"Asset"</th>
+                                    <th>"Balance"</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>"ETH"</td>
+                                    <td>"1000.5"</td>
+                                </tr>
+                                <tr>
+                                    <td>"BTC"</td>
+                                    <td>"0.25"</td>
+                                </tr>
+                                <tr>
+                                    <td>"USDC"</td>
+                                    <td>"50,000.00"</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="section">
+                        <h2>"Live Access Log"</h2>
+                        <AccessLogTable/>
+                    </div>
+
+                    <div class="footer">
+                        <p>"Try it yourself: " <code>"http://192.168.7.10:3000/balances"</code></p>
+                    </div>
+                </div>
+            </body>
+        </html>
     }
+}
 
-    #[tokio::test]
-    async fn hello_world() {
-        let response = get_app()
-            .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
-            .await
-            .unwrap();
+#[component]
+pub fn AccessLogTable() -> impl IntoView {
+    view! {
+        <div id="log-container">
+            <table class="log-table">
+                <thead>
+                    <tr>
+                        <th style="width: 120px;">"Time"</th>
+                        <th>"Activity"</th>
+                    </tr>
+                </thead>
+                <tbody id="log-entries">
+                    <tr>
+                        <td colspan="2" style="text-align: center; font-style: italic;">"Waiting for access attempts..."</td>
+                    </tr>
+                </tbody>
+            </table>
 
-        assert_eq!(response.status(), StatusCode::OK);
-
-        let body = response.into_body().collect().await.unwrap().to_bytes();
-        assert_eq!(&body[..], b"Hello, World!");
-    }
-
-    #[tokio::test]
-    async fn json() {
-        let response = get_app()
-            .oneshot(
-                Request::builder()
-                    .method(http::Method::GET)
-                    .uri("/formats/json")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(response.status(), StatusCode::OK);
-
-        let body = response.into_body().collect().await.unwrap().to_bytes();
-        let body: Value = serde_json::from_slice(&body).unwrap();
-        assert_eq!(
-            body.get("id").unwrap().as_number().unwrap().as_u64(),
-            Some(1234567890)
-        );
+            <script>
+                r#"
+                async function updateLog() {
+                    try {
+                        const response = await fetch('/log');
+                        const entries = await response.json();
+                        
+                        const tbody = document.getElementById('log-entries');
+                        if (entries.length === 0) {
+                            tbody.innerHTML = '<tr><td colspan="2" style="text-align: center; font-style: italic;">No access attempts yet...</td></tr>';
+                            return;
+                        }
+                        
+                        // Show the last 10 entries in reverse order (newest first)
+                        const recentEntries = entries.slice(-10).reverse();
+                        
+                        tbody.innerHTML = recentEntries.map(entry => {
+                            const time = new Date(entry.timestamp).toLocaleTimeString();
+                            
+                            return `
+                                <tr>
+                                    <td style="width: 120px;">${time}</td>
+                                    <td>${entry.message}</td>
+                                </tr>
+                            `;
+                        }).join('');
+                    } catch (error) {
+                        console.error('Failed to update log:', error);
+                    }
+                }
+                
+                // Update immediately
+                updateLog();
+                
+                // Set up periodic updates every 2 seconds
+                setInterval(updateLog, 2000);
+                "#
+            </script>
+        </div>
     }
 }
