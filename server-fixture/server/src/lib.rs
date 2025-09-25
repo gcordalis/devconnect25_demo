@@ -54,11 +54,16 @@ struct AppState {
 fn add_to_global_log(message: String) {
     let entry = LogEntry {
         timestamp: Utc::now(),
-        message,
+        message: message.clone(),
     };
 
     let mut logs = GLOBAL_LOGS.write().unwrap();
     logs.push(entry);
+    println!(
+        "DEBUG: Added log entry: '{}', total entries: {}",
+        message,
+        logs.len()
+    );
 
     // Keep only the last 50 entries to avoid unbounded memory growth
     if logs.len() > 50 {
@@ -85,6 +90,7 @@ fn app(state: AppState) -> Router {
 pub async fn bind<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
     socket: T,
 ) -> anyhow::Result<()> {
+    // Add a test log entry on startup
     let key = PrivateKeyDer::Pkcs8(SERVER_KEY_DER.into());
     let cert = CertificateDer::from(SERVER_CERT_DER);
 
@@ -218,6 +224,7 @@ pub fn App() -> impl IntoView {
             <head>
                 <meta charset="utf-8"/>
                 <meta name="viewport" content="width=device-width, initial-scale=1"/>
+                <meta http-equiv="refresh" content="2"/>
                 <title>"Swiss Bank Demo"</title>
                 <style>
                     "
@@ -332,28 +339,7 @@ pub fn App() -> impl IntoView {
 
                     <div class="section">
                         <h2>"Bank Reserves"</h2>
-                        <table class="balances-table">
-                            <thead>
-                                <tr>
-                                    <th>"Asset"</th>
-                                    <th>"Balance"</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>"ETH"</td>
-                                    <td>"1000.5"</td>
-                                </tr>
-                                <tr>
-                                    <td>"BTC"</td>
-                                    <td>"0.25"</td>
-                                </tr>
-                                <tr>
-                                    <td>"USDC"</td>
-                                    <td>"50,000.00"</td>
-                                </tr>
-                            </tbody>
-                        </table>
+                        <p>This is confidational information. Only the EF (Prover) has access.</p>
                     </div>
 
                     <div class="section">
@@ -372,6 +358,10 @@ pub fn App() -> impl IntoView {
 
 #[component]
 pub fn AccessLogTable() -> impl IntoView {
+    // Read logs from GLOBAL_LOGS during server rendering
+    let logs = GLOBAL_LOGS.read().unwrap();
+    let log_entries = logs.clone();
+
     view! {
         <div id="log-container">
             <table class="log-table">
@@ -382,50 +372,33 @@ pub fn AccessLogTable() -> impl IntoView {
                     </tr>
                 </thead>
                 <tbody id="log-entries">
-                    <tr>
-                        <td colspan="2" style="text-align: center; font-style: italic;">"Waiting for access attempts..."</td>
-                    </tr>
+                    {if log_entries.is_empty() {
+                        view! {
+                            <tr>
+                                <td colspan="2" style="text-align: center; font-style: italic;">"Waiting for access attempts..."</td>
+                            </tr>
+                        }.into_view()
+                    } else {
+                        log_entries.into_iter().rev().map(|entry| {
+                            let time_str = entry.timestamp.format("%H:%M:%S").to_string();
+                            let status_class = if entry.message.contains("✅") {
+                                "status-authorized"
+                            } else if entry.message.contains("❌") {
+                                "status-unauthorized"
+                            } else {
+                                ""
+                            };
+
+                            view! {
+                                <tr>
+                                    <td>{time_str}</td>
+                                    <td class={status_class}>{entry.message}</td>
+                                </tr>
+                            }
+                        }).collect_view()
+                    }}
                 </tbody>
             </table>
-
-            <script>
-                r#"
-                async function updateLog() {
-                    try {
-                        const response = await fetch('/log');
-                        const entries = await response.json();
-                        
-                        const tbody = document.getElementById('log-entries');
-                        if (entries.length === 0) {
-                            tbody.innerHTML = '<tr><td colspan="2" style="text-align: center; font-style: italic;">No access attempts yet...</td></tr>';
-                            return;
-                        }
-                        
-                        // Show the last 10 entries in reverse order (newest first)
-                        const recentEntries = entries.slice(-10).reverse();
-                        
-                        tbody.innerHTML = recentEntries.map(entry => {
-                            const time = new Date(entry.timestamp).toLocaleTimeString();
-                            
-                            return `
-                                <tr>
-                                    <td style="width: 120px;">${time}</td>
-                                    <td>${entry.message}</td>
-                                </tr>
-                            `;
-                        }).join('');
-                    } catch (error) {
-                        console.error('Failed to update log:', error);
-                    }
-                }
-                
-                // Update immediately
-                updateLog();
-                
-                // Set up periodic updates every 2 seconds
-                setInterval(updateLog, 2000);
-                "#
-            </script>
         </div>
     }
 }
