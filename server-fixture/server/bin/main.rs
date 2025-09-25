@@ -1,6 +1,6 @@
 use std::{env, io};
 
-use tlsn_server_fixture::{bind, DEFAULT_FIXTURE_PORT};
+use tlsn_server_fixture::{bind_with_addr, DEFAULT_FIXTURE_PORT};
 use tokio::net::TcpListener;
 use tokio_util::compat::TokioAsyncWriteCompatExt;
 use tracing::info;
@@ -16,7 +16,7 @@ async fn main() -> io::Result<()> {
 
     info!("Starting server fixture on port {port}");
     loop {
-        let (socket, _) = listener.accept().await?;
-        tokio::spawn(bind(socket.compat_write()));
+        let (socket, remote_addr) = listener.accept().await?;
+        tokio::spawn(bind_with_addr(socket.compat_write(), remote_addr));
     }
 }

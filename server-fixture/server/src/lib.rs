@@ -1,8 +1,11 @@
-use std::sync::{Arc, Mutex, RwLock};
+use std::{
+    net::SocketAddr,
+    sync::{Arc, Mutex, RwLock},
+};
 
 use axum::{
-    extract::State,
-    http::Request,
+    extract::ConnectInfo,
+    http::{HeaderMap, Request},
     middleware::{self, Next},
     response::Html,
     routing::get,
@@ -78,17 +81,15 @@ fn app(state: AppState) -> Router {
     Router::new()
         .route("/", get(dashboard_handler))
         .route("/balances", get(balances_route))
-        .layer(middleware::from_fn_with_state(
-            state_arc.clone(),
-            access_log_middleware,
-        ))
+        .layer(middleware::from_fn(access_log_middleware))
         .layer(TraceLayer::new_for_http())
         .with_state(state_arc)
 }
 
-/// Bind the server to the given socket.
-pub async fn bind<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
+/// Bind the server to the given socket with remote address info.
+pub async fn bind_with_addr<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
     socket: T,
+    remote_addr: SocketAddr,
 ) -> anyhow::Result<()> {
     // Add a test log entry on startup
     let key = PrivateKeyDer::Pkcs8(SERVER_KEY_DER.into());
@@ -119,7 +120,11 @@ pub async fn bind<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
     };
     let tower_service = app(state);
 
-    let hyper_service = hyper::service::service_fn(move |request: Request<Incoming>| {
+    // Create a service that includes socket information in requests
+    let hyper_service = hyper::service::service_fn(move |mut request: Request<Incoming>| {
+        // Insert the actual remote address into the request extensions
+        request.extensions_mut().insert(ConnectInfo(remote_addr));
+
         tower_service.clone().call(request)
     });
 
@@ -133,15 +138,26 @@ pub async fn bind<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
     Ok(())
 }
 
+/// Bind the server to the given socket.
+pub async fn bind<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
+    socket: T,
+) -> anyhow::Result<()> {
+    // Fallback for when remote address is not available
+    let placeholder_addr = SocketAddr::from(([127, 0, 0, 1], 0));
+    bind_with_addr(socket, placeholder_addr).await
+}
+
 async fn access_log_middleware(
-    State(_state): State<Arc<Mutex<AppState>>>,
     req: Request<axum::body::Body>,
     next: Next,
 ) -> axum::response::Response {
     // Only log requests to /balances
     if req.uri().path() == "/balances" {
-        // Since we're using custom TLS transport, we'll use a placeholder IP
-        let ip = "unknown".to_string();
+        let ip = req
+            .extensions()
+            .get::<ConnectInfo<SocketAddr>>()
+            .map(|ConnectInfo(addr)| addr.ip().to_string())
+            .unwrap_or_else(|| "<unknown>".to_string());
 
         // Check authorization header
         let expected_token = "random_auth_token";
@@ -208,17 +224,32 @@ where
     }
 }
 
-async fn balances_route(_: AuthenticatedUser) -> Result<Json<Value>, StatusCode> {
+async fn balances_route(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    _: AuthenticatedUser,
+) -> Result<Json<Value>, StatusCode> {
+    // Now you have access to the socket address in this handler
+    info!("Balances accessed from: {}", addr);
     get_json_value(include_str!("data/balances.json"))
 }
 
-async fn dashboard_handler() -> Html<String> {
-    let app_html = leptos::ssr::render_to_string(App);
+async fn dashboard_handler(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+) -> Html<String> {
+    // Get the Host header to determine the server address
+    let host = headers
+        .get("host")
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("localhost:3000")
+        .to_string();
+
+    let app_html = leptos::ssr::render_to_string(move || view! { <App host=host /> });
     Html(app_html.to_string())
 }
 
 #[component]
-pub fn App() -> impl IntoView {
+pub fn App(#[prop(default = "localhost:3000".to_string())] host: String) -> impl IntoView {
     view! {
         <html lang="en">
             <head>
@@ -348,7 +379,7 @@ pub fn App() -> impl IntoView {
                     </div>
 
                     <div class="footer">
-                        <p>"Try it yourself: " <code>"http://192.168.7.10:3000/balances"</code></p>
+                        <p>"Try it yourself: " <code>{format!("https://{}/balances", host)}</code></p>
                     </div>
                 </div>
             </body>
