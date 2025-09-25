@@ -2,6 +2,7 @@
 members = [
     "server-fixture/certs",
     "server-fixture/server",
+    "tlsn-demo-server",
 ]
 resolver = "2"
 
