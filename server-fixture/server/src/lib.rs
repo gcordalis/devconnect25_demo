@@ -1,11 +1,11 @@
 use std::{
-    net::SocketAddr,
+    net::{SocketAddr, UdpSocket},
     sync::{Arc, Mutex, RwLock},
 };
 
 use axum::{
     extract::ConnectInfo,
-    http::{HeaderMap, Request},
+    http::Request,
     middleware::{self, Next},
     response::Html,
     routing::get,
@@ -38,6 +38,15 @@ use tracing::info;
 
 pub const DEFAULT_FIXTURE_PORT: u16 = 3000;
 
+fn get_local_ip() -> String {
+    if let Ok(ip) = local_ip_address::local_ip() {
+        if !ip.is_loopback() {
+            return ip.to_string();
+        }
+    }
+    "localhost".to_string()
+}
+
 // Global log storage that persists across all TLS connections
 lazy_static! {
     static ref GLOBAL_LOGS: Arc<RwLock<Vec<LogEntry>>> = Arc::new(RwLock::new(Vec::new()));
@@ -62,16 +71,11 @@ fn add_to_global_log(message: String) {
 
     let mut logs = GLOBAL_LOGS.write().unwrap();
     logs.push(entry);
-    println!(
-        "DEBUG: Added log entry: '{}', total entries: {}",
-        message,
-        logs.len()
-    );
 
-    // Keep only the last 50 entries to avoid unbounded memory growth
-    if logs.len() > 50 {
+    // Keep only the last 15 entries to avoid unbounded memory growth
+    if logs.len() > 15 {
         let len = logs.len();
-        logs.drain(0..len - 50);
+        logs.drain(0..len - 15);
     }
 }
 
@@ -233,16 +237,10 @@ async fn balances_route(
     get_json_value(include_str!("data/balances.json"))
 }
 
-async fn dashboard_handler(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    headers: HeaderMap,
-) -> Html<String> {
-    // Get the Host header to determine the server address
-    let host = headers
-        .get("host")
-        .and_then(|h| h.to_str().ok())
-        .unwrap_or("localhost:3000")
-        .to_string();
+async fn dashboard_handler() -> Html<String> {
+    let local_ip = get_local_ip();
+    let port = std::env::var("PORT").unwrap_or_else(|_| DEFAULT_FIXTURE_PORT.to_string());
+    let host = format!("{}:{}", local_ip, port);
 
     let app_html = leptos::ssr::render_to_string(move || view! { <App host=host /> });
     Html(app_html.to_string())

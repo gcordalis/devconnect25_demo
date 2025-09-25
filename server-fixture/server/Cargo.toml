@@ -27,6 +27,7 @@ leptos_axum = { version = "0.6" }
 serde = { version = "1.0", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
 lazy_static = { version = "1.4" }
+local-ip-address = { version = "0.6" }
 
 [[bin]]
 name = "tlsn-server-fixture"
