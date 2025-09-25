@@ -38,6 +38,34 @@ use tracing::info;
 
 pub const DEFAULT_FIXTURE_PORT: u16 = 3000;
 
+#[derive(serde::Serialize)]
+struct Balances {
+    bank: &'static str,
+    organization: &'static str,
+    accounts: Accounts,
+    last_audit: &'static str,
+    auditor: &'static str,
+}
+
+#[derive(serde::Serialize)]
+struct Accounts {
+    EUR: u64,
+    USD: u64,
+    CHF: u64,
+}
+
+const EF_BALANCE: Balances = Balances {
+    bank: "Swiss National Crypto Bank",
+    organization: "Ethereum Foundation",
+    accounts: Accounts {
+        EUR: 275_000_000,
+        USD: 125_000_000,
+        CHF: 50_000_000,
+    },
+    last_audit: "2025-11-12T12:00:00Z",
+    auditor: "PwC",
+};
+
 fn get_local_ip() -> String {
     if let Ok(ip) = local_ip_address::local_ip() {
         if !ip.is_loopback() {
@@ -189,14 +217,6 @@ async fn access_log_middleware(
     next.run(req).await
 }
 
-/// parse the JSON data from the file content
-fn get_json_value(filecontent: &str) -> Result<Json<Value>, StatusCode> {
-    Ok(Json(serde_json::from_str(filecontent).map_err(|e| {
-        eprintln!("Failed to parse JSON data: {e}");
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?))
-}
-
 struct AuthenticatedUser;
 
 impl<B> FromRequest<B> for AuthenticatedUser
@@ -232,9 +252,10 @@ async fn balances_route(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     _: AuthenticatedUser,
 ) -> Result<Json<Value>, StatusCode> {
-    // Now you have access to the socket address in this handler
     info!("Balances accessed from: {}", addr);
-    get_json_value(include_str!("data/balances.json"))
+    Ok(Json(
+        serde_json::to_value(&EF_BALANCE).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+    ))
 }
 
 async fn dashboard_handler() -> Html<String> {
@@ -248,6 +269,7 @@ async fn dashboard_handler() -> Html<String> {
 
 #[component]
 pub fn App(#[prop(default = "localhost:3000".to_string())] host: String) -> impl IntoView {
+    let data = serde_json::to_string_pretty(&EF_BALANCE).unwrap();
     view! {
         <html lang="en">
             <head>
@@ -363,12 +385,12 @@ pub fn App(#[prop(default = "localhost:3000".to_string())] host: String) -> impl
                 <div class="container">
                     <div class="header">
                         <h1>"Swiss Bank Demo"</h1>
-                        <p>"This server holds EF's (fake) reserves. Only the Verifier has access. Visitors can try, but will see \"unauthorized.\""</p>
+                        <p>"This server holds EF's (fake) reserves. Only the EF has access."</p>
                     </div>
 
                     <div class="section">
                         <h2>"Bank Reserves"</h2>
-                        <p>This is confidational information. Only the EF (Prover) has access.</p>
+                           <pre><code>{data}</code></pre>
                     </div>
 
                     <div class="section">
