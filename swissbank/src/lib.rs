@@ -3,7 +3,6 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-
 use axum::{
     extract::ConnectInfo,
     http::Request,
@@ -12,8 +11,8 @@ use axum::{
     routing::get,
     Json, Router,
 };
+use dioxus::prelude::*;
 use lazy_static::lazy_static;
-use leptos::*;
 use tower_http::trace::TraceLayer;
 
 use hyper::StatusCode;
@@ -29,6 +28,8 @@ use hyper::header;
 use tracing::info;
 
 pub const DEFAULT_FIXTURE_PORT: u16 = 3000;
+const AUTH_TOKEN: &str = "random_auth_token";
+const DASHBOARD_CSS: &str = include_str!("dashboard.css");
 
 fn get_local_ip() -> String {
     if let Ok(ip) = local_ip_address::local_ip() {
@@ -39,7 +40,6 @@ fn get_local_ip() -> String {
     "localhost".to_string()
 }
 
-// Global log storage that persists across all TLS connections
 lazy_static! {
     static ref GLOBAL_LOGS: Arc<RwLock<Vec<LogEntry>>> = Arc::new(RwLock::new(Vec::new()));
 }
@@ -50,13 +50,11 @@ pub struct LogEntry {
     pub message: String,
 }
 
-// Removed AppState struct - not needed for simple HTTP server
-
 // Helper function to add logs to global storage
 fn add_to_global_log(message: String) {
     let entry = LogEntry {
         timestamp: Utc::now(),
-        message: message.clone(),
+        message: message,
     };
 
     let mut logs = GLOBAL_LOGS.write().unwrap();
@@ -74,8 +72,40 @@ fn app() -> Router {
         .route("/", get(dashboard_handler))
         .route("/balances", get(balances_route))
         .route("/logs", get(logs_endpoint))
+        .route("/logs-html", get(logs_html_endpoint))
         .layer(middleware::from_fn(access_log_middleware))
         .layer(TraceLayer::new_for_http())
+}
+
+async fn logs_html_endpoint() -> Html<String> {
+    let logs = GLOBAL_LOGS.read().unwrap();
+
+    let html = if logs.is_empty() {
+        String::from(
+            r#"<tr><td colspan="2" style="text-align: center; font-style: italic;">Waiting for access attempts...</td></tr>"#,
+        )
+    } else {
+        logs.iter()
+            .rev()
+            .map(|entry| {
+                let time_str = entry.timestamp.format("%H:%M:%S").to_string();
+                let status_class = if entry.message.contains("✅") {
+                    "status-authorized"
+                } else if entry.message.contains("❌") {
+                    "status-unauthorized"
+                } else {
+                    ""
+                };
+                format!(
+                    r#"<tr><td>{}</td><td class="{}">{}</td></tr>"#,
+                    time_str, status_class, entry.message
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+
+    Html(html)
 }
 
 /// Start the HTTP server
@@ -99,8 +129,6 @@ pub async fn serve() -> anyhow::Result<()> {
     Ok(())
 }
 
-// Removed old bind function - using axum::serve now
-
 async fn access_log_middleware(
     req: Request<axum::body::Body>,
     next: Next,
@@ -114,14 +142,13 @@ async fn access_log_middleware(
             .unwrap_or_else(|| "<unknown>".to_string());
 
         // Check authorization header
-        let expected_token = "random_auth_token";
         let is_authorized = req
             .headers()
             .get("authorization")
             .and_then(|value| value.to_str().ok())
             .map(|auth_token| {
                 let token = auth_token.trim_start_matches("Bearer ");
-                token == expected_token
+                token == AUTH_TOKEN
             })
             .unwrap_or(false);
 
@@ -139,29 +166,18 @@ async fn access_log_middleware(
     next.run(req).await
 }
 
-/// parse the JSON data from the file content
-fn get_json_value(filecontent: &str) -> Result<Json<Value>, StatusCode> {
-    Ok(Json(serde_json::from_str(filecontent).map_err(|e| {
-        eprintln!("Failed to parse JSON data: {e}");
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?))
-}
-
 struct AuthenticatedUser;
 
-impl<B> FromRequest<B> for AuthenticatedUser
+impl<S> FromRequest<S> for AuthenticatedUser
 where
-    B: Send + Sync,
+    S: Send + Sync,
 {
     type Rejection = (StatusCode, &'static str);
 
     async fn from_request(
         req: axum::extract::Request,
-        _state: &B,
+        _state: &S,
     ) -> Result<Self, Self::Rejection> {
-        // Expected token (hardcoded for simplicity in the demo)
-        let expected_token = "random_auth_token";
-
         let auth_header = req
             .headers()
             .get(header::AUTHORIZATION)
@@ -169,7 +185,7 @@ where
 
         if let Some(auth_token) = auth_header {
             let token = auth_token.trim_start_matches("Bearer ");
-            if token == expected_token {
+            if token == AUTH_TOKEN {
                 return Ok(AuthenticatedUser);
             }
         }
@@ -187,7 +203,12 @@ async fn balances_route(
 }
 
 fn get_bank_data() -> Result<Json<Value>, StatusCode> {
-    get_json_value(include_str!("data/swissbankdata.json"))
+    Ok(Json(
+        serde_json::from_str(include_str!("data/swissbankdata.json")).map_err(|e| {
+            eprintln!("Failed to parse JSON data: {e}");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?,
+    ))
 }
 
 async fn logs_endpoint() -> Json<Vec<LogEntry>> {
@@ -200,244 +221,68 @@ async fn dashboard_handler() -> Html<String> {
     let port = std::env::var("PORT").unwrap_or_else(|_| DEFAULT_FIXTURE_PORT.to_string());
     let host = format!("{}:{}", local_ip, port);
 
-    let app_html = leptos::ssr::render_to_string(move || view! { <App host=host /> });
-    Html(app_html.to_string())
+    let mut vdom = VirtualDom::new_with_props(App, AppProps { host });
+    vdom.rebuild_in_place();
+    let app_html = dioxus_ssr::render(&vdom);
+    Html(app_html)
 }
 
+#[derive(Props, Clone, PartialEq)]
+pub struct AppProps {
+    host: String,
+}
 
 #[component]
-pub fn App(#[prop(default = "localhost:3000".to_string())] host: String) -> impl IntoView {
+pub fn App(props: AppProps) -> Element {
     let data = get_bank_data().unwrap();
     let data = serde_json::to_string_pretty(&*data).unwrap();
-    
-    view! {
-        <html lang="en">
-            <head>
-                <meta charset="utf-8"/>
-                <meta name="viewport" content="width=device-width, initial-scale=1"/>
-                <title>"Swiss Bank Demo"</title>
-                <style>
-                    "
-                    body {
-                        font-family: Arial, sans-serif;
-                        margin: 0;
-                        padding: 20px;
-                        background: white;
-                        color: black;
-                        font-size: 18px;
-                        line-height: 1.6;
+
+    rsx! {
+        head {
+            meta { charset: "utf-8" }
+            meta { name: "viewport", content: "width=device-width, initial-scale=1" }
+            title { "Swiss Bank Demo" }
+            script { src: "https://unpkg.com/htmx.org@1.9.10" }
+            style { dangerous_inner_html: DASHBOARD_CSS }
+        }
+        body {
+            div { class: "container",
+                    div { class: "header",
+                        h1 { "Swiss Bank Demo" }
+                        p { "This server holds EF's (fake) reserves. Only the EF has access." }
                     }
-                    .container {
-                        max-width: 1200px;
-                        margin: 0 auto;
-                    }
-                    .header {
-                        text-align: center;
-                        margin-bottom: 40px;
-                        padding: 30px;
-                        border-bottom: 3px solid #333;
-                    }
-                    .header h1 {
-                        font-size: 4rem;
-                        margin: 0 0 20px 0;
-                        color: #2c5aa0;
-                    }
-                    .header p {
-                        font-size: 1.5rem;
-                        margin: 0;
-                        color: #666;
-                    }
-                    .section {
-                        margin: 40px 0;
-                        padding: 30px;
-                        border: 2px solid #ddd;
-                        border-radius: 10px;
-                    }
-                    .section h2 {
-                        font-size: 2.5rem;
-                        margin-top: 0;
-                        color: #333;
-                        border-bottom: 2px solid #333;
-                        padding-bottom: 10px;
-                    }
-                    .balances-table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        font-size: 1.5rem;
-                        margin: 20px 0;
-                    }
-                    .balances-table th,
-                    .balances-table td {
-                        padding: 15px;
-                        text-align: left;
-                        border-bottom: 2px solid #ddd;
-                    }
-                    .balances-table th {
-                        background-color: #f8f9fa;
-                        font-weight: bold;
-                    }
-                    .log-table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        font-size: 1.2rem;
-                    }
-                    .log-table th,
-                    .log-table td {
-                        padding: 12px;
-                        text-align: left;
-                        border-bottom: 1px solid #ddd;
-                    }
-                    .log-table th {
-                        background-color: #f8f9fa;
-                        font-weight: bold;
-                        font-size: 1.3rem;
-                    }
-                    .log-table tbody tr:nth-child(even) {
-                        background-color: #f8f9fa;
-                    }
-                    .status-authorized {
-                        color: #28a745;
-                        font-weight: bold;
-                    }
-                    .status-unauthorized {
-                        color: #dc3545;
-                        font-weight: bold;
-                    }
-                    .footer {
-                        text-align: center;
-                        margin-top: 40px;
-                        padding: 20px;
-                        background-color: #f8f9fa;
-                        border-radius: 10px;
-                        font-size: 1.3rem;
-                    }
-                    .footer code {
-                        background: #e9ecef;
-                        padding: 5px 10px;
-                        border-radius: 5px;
-                        font-family: monospace;
-                    }
-                    "
-                </style>
-                    <script>
-                    "
-                    async function updateLogs() {
-                        try {
-                            const response = await fetch('/logs');
-                            const logs = await response.json();
-                            
-                            const tbody = document.getElementById('log-entries');
-                            if (!tbody) return;
-                            
-                            // Clear existing rows
-                            tbody.innerHTML = '';
-                            
-                            if (logs.length === 0) {
-                                tbody.innerHTML = '<tr><td colspan="2" style=\"text-align: center; font-style: italic;\">Waiting for access attempts...</td></tr>';
-                            } else {
-                                // Add logs in reverse order (newest first)
-                                logs.reverse().forEach(entry => {
-                                    const row = document.createElement('tr');
-                                    
-                                    const timeCell = document.createElement('td');
-                                    const time = new Date(entry.timestamp);
-                                    timeCell.textContent = time.toLocaleTimeString('en-US', { hour12: false });
-                                    
-                                    const messageCell = document.createElement('td');
-                                    messageCell.textContent = entry.message;
-                                    if (entry.message.includes('✅')) {
-                                        messageCell.className = 'status-authorized';
-                                    } else if (entry.message.includes('❌')) {
-                                        messageCell.className = 'status-unauthorized';
-                                    }
-                                    
-                                    row.appendChild(timeCell);
-                                    row.appendChild(messageCell);
-                                    tbody.appendChild(row);
-                                });
-                            }
-                        } catch (error) {
-                            console.error('Failed to fetch logs:', error);
+
+                    div { class: "section",
+                        h2 { "Bank Reserves" }
+                        pre {
+                            code { "{data}" }
                         }
                     }
-                    
-                    // Update logs every 2 seconds
-                    setInterval(updateLogs, 2000);
-                    
-                    // Also update when page loads
-                    window.addEventListener('load', updateLogs);
-                    "
-                </script>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="header">
-                        <h1>"Swiss Bank Demo"</h1>
-                        <p>"This server holds EF's (fake) reserves. Only the EF has access."</p>
-                    </div>
 
-                    <div class="section">
-                        <h2>"Bank Reserves"</h2>
-                           <pre><code>{data}</code></pre>
-                    </div>
-
-                    <div class="section">
-                        <h2>"Live Access Log"</h2>
-                        <AccessLogTable/>
-                    </div>
-
-                    <div class="footer">
-                        <p>"Try it yourself: " <code>{format!("http://{}/balances", host)}</code></p>
-                    </div>
-                </div>
-            </body>
-        </html>
-    }
-}
-
-#[component]
-pub fn AccessLogTable() -> impl IntoView {
-    // Read logs from GLOBAL_LOGS during server rendering
-    let logs = GLOBAL_LOGS.read().unwrap();
-    let log_entries = logs.clone();
-
-    view! {
-        <div id="log-container">
-            <table class="log-table">
-                <thead>
-                    <tr>
-                        <th style="width: 120px;">"Time"</th>
-                        <th>"Activity"</th>
-                    </tr>
-                </thead>
-                <tbody id="log-entries">
-                    {if log_entries.is_empty() {
-                        view! {
-                            <tr>
-                                <td colspan="2" style="text-align: center; font-style: italic;">"Waiting for access attempts..."</td>
-                            </tr>
-                        }.into_view()
-                    } else {
-                        log_entries.into_iter().rev().map(|entry| {
-                            let time_str = entry.timestamp.format("%H:%M:%S").to_string();
-                            let status_class = if entry.message.contains("✅") {
-                                "status-authorized"
-                            } else if entry.message.contains("❌") {
-                                "status-unauthorized"
-                            } else {
-                                ""
-                            };
-
-                            view! {
-                                <tr>
-                                    <td>{time_str}</td>
-                                    <td class={status_class}>{entry.message}</td>
-                                </tr>
+                    div { class: "section",
+                        h2 { "Live Access Log" }
+                        table { class: "log-table",
+                            thead {
+                                tr {
+                                    th { style: "width: 120px;", "Time" }
+                                    th { "Activity" }
+                                }
                             }
-                        }).collect_view()
-                    }}
-                </tbody>
-            </table>
-        </div>
+                            tbody {
+                                "hx-get": "/logs-html",
+                                "hx-trigger": "load, every 2s",
+                                "hx-swap": "innerHTML"
+                            }
+                        }
+                    }
+
+                div { class: "footer",
+                    p {
+                        "Try it yourself: "
+                        code { "http://{props.host}/balances" }
+                    }
+                }
+            }
+        }
     }
 }

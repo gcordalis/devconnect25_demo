@@ -1,0 +1,97 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background: white;
+    color: black;
+    font-size: 18px;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 40px;
+    padding: 30px;
+    border-bottom: 3px solid #333;
+}
+
+.header h1 {
+    font-size: 4rem;
+    margin: 0 0 20px 0;
+    color: #2c5aa0;
+}
+
+.header p {
+    font-size: 1.5rem;
+    margin: 0;
+    color: #666;
+}
+
+.section {
+    margin: 40px 0;
+    padding: 30px;
+    border: 2px solid #ddd;
+    border-radius: 10px;
+}
+
+.section h2 {
+    font-size: 2.5rem;
+    margin-top: 0;
+    color: #333;
+    border-bottom: 2px solid #333;
+    padding-bottom: 10px;
+}
+
+.log-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 1.2rem;
+}
+
+.log-table th,
+.log-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.log-table th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+    font-size: 1.3rem;
+}
+
+.log-table tbody tr:nth-child(even) {
+    background-color: #f8f9fa;
+}
+
+.status-authorized {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.status-unauthorized {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.footer {
+    text-align: center;
+    margin-top: 40px;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 10px;
+    font-size: 1.3rem;
+}
+
+.footer code {
+    background: #e9ecef;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-family: monospace;
+}
