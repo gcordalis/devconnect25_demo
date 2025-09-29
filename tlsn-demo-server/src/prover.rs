@@ -1,14 +1,15 @@
+use http::header;
 use http_body_util::Empty;
 use hyper::{body::Bytes, Request, StatusCode, Uri};
 use hyper_util::rt::TokioIo;
 use rangeset::RangeSet;
 use spansy::{
-    http::parse_response,
+    http::{parse_response, Requests},
     json::{self},
     Spanned,
 };
 
-use crate::config::{MAX_RECV_DATA, MAX_SENT_DATA, SECRET};
+use crate::config::{MAX_RECV_DATA, MAX_SENT_DATA};
 use tlsn::connection::ServerName;
 use tlsn::prover::{ProveConfig, ProveConfigBuilder, Prover, ProverConfig};
 use tlsn::{
@@ -94,7 +95,7 @@ pub async fn prover<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
         .uri(server_uri.clone())
         .header("Host", server_domain)
         .header("Connection", "close")
-        .header("Secret", SECRET)
+        .header(header::AUTHORIZATION, "Bearer random_auth_token")
         .method("GET")
         .body(Empty::<Bytes>::new())
         .unwrap();
@@ -135,11 +136,11 @@ fn redact_and_reveal_received_data(recv_transcript: &[u8]) -> RangeSet<usize> {
     let mut json = json::parse_slice(body.as_bytes()).unwrap();
     json.offset(body.content.span().indices().min().unwrap());
 
-    let name = json.get("information.name").expect("name field not found");
+    let name = json
+        .get("organization")
+        .expect("organization field not found");
 
-    let street = json
-        .get("information.address.street")
-        .expect("street field not found");
+    let street = json.get("bank").expect("bank field not found");
 
     let name_start = name.span().indices().min().unwrap() - 9; // 9 is the length of "name: "
     let name_end = name.span().indices().max().unwrap() + 1; // include `"`
@@ -153,15 +154,28 @@ fn redact_and_reveal_received_data(recv_transcript: &[u8]) -> RangeSet<usize> {
 fn redact_and_reveal_sent_data(sent_transcript: &[u8]) -> RangeSet<usize> {
     let sent_transcript_len = sent_transcript.len();
 
-    let sent_string: String = String::from_utf8(sent_transcript.to_vec()).unwrap();
-    let secret_start = sent_string.find(SECRET).unwrap();
+    let reqs = Requests::new_from_slice(sent_transcript)
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
 
-    debug!("Send data: {}", sent_string);
+    let req = reqs.first().ok_or("No requests found").unwrap();
+
+    let authorization_header = req
+        .headers_with_name(header::AUTHORIZATION.as_str())
+        .next()
+        .expect("Authorization header not found");
+
+    let start_pos = authorization_header
+        .span()
+        .indices()
+        .min()
+        .expect("Could not find authorization header start position")
+        + header::AUTHORIZATION.as_str().len()
+        + 2;
+    let end_pos =
+        start_pos + authorization_header.span().len() - header::AUTHORIZATION.as_str().len() - 2;
 
     // Reveal everything except for the SECRET.
-    [
-        0..secret_start,
-        secret_start + SECRET.len()..sent_transcript_len,
-    ]
-    .into()
+    // [0..sent_transcript_len].into()
+    [0..start_pos, end_pos..sent_transcript_len].into()
 }

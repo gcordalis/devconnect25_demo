@@ -65,13 +65,17 @@ pub async fn verifier<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
 
     debug!("Received data: {:?}", response);
     response
-        .find("123 Elm Street")
+        .find("Ethereum Foundation")
         .ok_or_else(|| eyre!("Verification failed: missing data in received data"))?;
 
     // Check Session info: server name.
     let ServerName::Dns(dns_name) = server_name;
     if dns_name.as_str() != server_domain {
-        return Err(eyre!("Verification failed: server name mismatches"));
+        return Err(eyre!(
+            "Verification failed: server name mismatches: {} != {}",
+            dns_name,
+            server_domain
+        ));
     }
 
     let sent_string = bytes_to_redacted_string(&sent)?;

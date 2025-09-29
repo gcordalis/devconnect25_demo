@@ -86,3 +86,19 @@ For Raspberry Pi deployment, run Chromium in kiosk mode:
 ```bash
 chromium-browser --kiosk http://localhost:3000/
 ```
+
+
+TODO:
+/etc/hosts
+ 127.0.0.1 test-server.io
+
+Compile for raspberry pi?
+```
+nix-shell --run "cargo build --target aarch64-unknown-linux-gnu --release"
+```
+```
+nix-shell --run "cargo build --target aarch64-unknown-linux-musl --release"
+```
+
+
+https://www.raspberrypi.com/tutorials/how-to-use-a-raspberry-pi-in-kiosk-mode/

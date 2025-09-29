@@ -7,9 +7,6 @@ pub const MAX_SENT_DATA: usize = 2048;
 /// Maximum number of bytes that can be received by prover from server
 pub const MAX_RECV_DATA: usize = 4096;
 
-/// Secret key used in demo requests (should be redacted in proofs)
-pub const SECRET: &str = "TLSNotary's private key 🤡";
-
 /// Default server configuration
 pub struct Config {
     pub ws_host: String,       // Address for WebSocket server
@@ -23,7 +20,9 @@ impl Default for Config {
         Self {
             ws_host: "0.0.0.0".into(),
             ws_port: 9816,
-            server_uri: "https://localhost:3000/balances".parse::<Uri>().unwrap(),
+            server_uri: "https://test-server.io:3000/balances"
+                .parse::<Uri>()
+                .unwrap(),
             wstcp_proxy_port: 55688,
         }
     }

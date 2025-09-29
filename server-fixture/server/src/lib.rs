@@ -1,5 +1,5 @@
 use std::{
-    net::{SocketAddr, UdpSocket},
+    net::SocketAddr,
     sync::{Arc, Mutex, RwLock},
 };
 
@@ -36,7 +36,7 @@ use hyper::header;
 use tlsn_server_fixture_certs::*;
 use tracing::info;
 
-pub const DEFAULT_FIXTURE_PORT: u16 = 3000;
+pub const DEFAULT_FIXTURE_PORT: u16 = 443;
 
 #[derive(serde::Serialize)]
 struct Balances {
@@ -55,7 +55,7 @@ struct Accounts {
 }
 
 const EF_BALANCE: Balances = Balances {
-    bank: "Swiss National Crypto Bank",
+    bank: "Swiss Bank",
     organization: "Ethereum Foundation",
     accounts: Accounts {
         EUR: 275_000_000,
@@ -217,6 +217,14 @@ async fn access_log_middleware(
     next.run(req).await
 }
 
+/// parse the JSON data from the file content
+fn get_json_value(filecontent: &str) -> Result<Json<Value>, StatusCode> {
+    Ok(Json(serde_json::from_str(filecontent).map_err(|e| {
+        eprintln!("Failed to parse JSON data: {e}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?))
+}
+
 struct AuthenticatedUser;
 
 impl<B> FromRequest<B> for AuthenticatedUser
@@ -253,9 +261,7 @@ async fn balances_route(
     _: AuthenticatedUser,
 ) -> Result<Json<Value>, StatusCode> {
     info!("Balances accessed from: {}", addr);
-    Ok(Json(
-        serde_json::to_value(&EF_BALANCE).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
-    ))
+    get_json_value(include_str!("data/swissbankdata.json"))
 }
 
 async fn dashboard_handler() -> Html<String> {
