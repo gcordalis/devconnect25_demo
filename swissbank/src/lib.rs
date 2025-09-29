@@ -3,6 +3,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+
 use axum::{
     extract::ConnectInfo,
     http::Request,
@@ -72,6 +73,7 @@ fn app() -> Router {
     Router::new()
         .route("/", get(dashboard_handler))
         .route("/balances", get(balances_route))
+        .route("/logs", get(logs_endpoint))
         .layer(middleware::from_fn(access_log_middleware))
         .layer(TraceLayer::new_for_http())
 }
@@ -188,6 +190,11 @@ fn get_bank_data() -> Result<Json<Value>, StatusCode> {
     get_json_value(include_str!("data/swissbankdata.json"))
 }
 
+async fn logs_endpoint() -> Json<Vec<LogEntry>> {
+    let logs = GLOBAL_LOGS.read().unwrap();
+    Json(logs.clone())
+}
+
 async fn dashboard_handler() -> Html<String> {
     let local_ip = get_local_ip();
     let port = std::env::var("PORT").unwrap_or_else(|_| DEFAULT_FIXTURE_PORT.to_string());
@@ -197,16 +204,17 @@ async fn dashboard_handler() -> Html<String> {
     Html(app_html.to_string())
 }
 
+
 #[component]
 pub fn App(#[prop(default = "localhost:3000".to_string())] host: String) -> impl IntoView {
     let data = get_bank_data().unwrap();
     let data = serde_json::to_string_pretty(&*data).unwrap();
+    
     view! {
         <html lang="en">
             <head>
                 <meta charset="utf-8"/>
                 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-                <meta http-equiv="refresh" content="2"/>
                 <title>"Swiss Bank Demo"</title>
                 <style>
                     "
@@ -311,6 +319,55 @@ pub fn App(#[prop(default = "localhost:3000".to_string())] host: String) -> impl
                     }
                     "
                 </style>
+                    <script>
+                    "
+                    async function updateLogs() {
+                        try {
+                            const response = await fetch('/logs');
+                            const logs = await response.json();
+                            
+                            const tbody = document.getElementById('log-entries');
+                            if (!tbody) return;
+                            
+                            // Clear existing rows
+                            tbody.innerHTML = '';
+                            
+                            if (logs.length === 0) {
+                                tbody.innerHTML = '<tr><td colspan="2" style=\"text-align: center; font-style: italic;\">Waiting for access attempts...</td></tr>';
+                            } else {
+                                // Add logs in reverse order (newest first)
+                                logs.reverse().forEach(entry => {
+                                    const row = document.createElement('tr');
+                                    
+                                    const timeCell = document.createElement('td');
+                                    const time = new Date(entry.timestamp);
+                                    timeCell.textContent = time.toLocaleTimeString('en-US', { hour12: false });
+                                    
+                                    const messageCell = document.createElement('td');
+                                    messageCell.textContent = entry.message;
+                                    if (entry.message.includes('✅')) {
+                                        messageCell.className = 'status-authorized';
+                                    } else if (entry.message.includes('❌')) {
+                                        messageCell.className = 'status-unauthorized';
+                                    }
+                                    
+                                    row.appendChild(timeCell);
+                                    row.appendChild(messageCell);
+                                    tbody.appendChild(row);
+                                });
+                            }
+                        } catch (error) {
+                            console.error('Failed to fetch logs:', error);
+                        }
+                    }
+                    
+                    // Update logs every 2 seconds
+                    setInterval(updateLogs, 2000);
+                    
+                    // Also update when page loads
+                    window.addEventListener('load', updateLogs);
+                    "
+                </script>
             </head>
             <body>
                 <div class="container">
