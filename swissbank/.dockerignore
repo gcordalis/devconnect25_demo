@@ -1,0 +1,18 @@
+# Ignore target directory (Rust build artifacts)
+target/
+
+# Ignore git files
+.git
+.gitignore
+
+# Ignore local config
+*.env
+*.toml.backup
+
+# Ignore editor files
+*.swp
+*.swo
+*.bak
+*.tmp
+.idea/
+.vscode/

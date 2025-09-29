@@ -1,28 +1,24 @@
 [package]
 name = "swissbank"
-publish = false
-version = "0.0.0"
+version = "0.0.1-alpha.1"
 edition = "2021"
 
-[lints]
-workspace = true
-
 [dependencies]
-axum = { workspace = true }
-anyhow = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-serde_json = { workspace = true }
-tracing.workspace = true
-tracing-subscriber.workspace = true
+axum = { version = "0.8" }
+anyhow = { version = "1.0" }
+tokio = { version = "1.38", features = ["macros", "rt-multi-thread"] }
+serde_json = { version = "1.0" }
+tracing = { version = "0.1" }
+tracing-subscriber = { version = "0.3" }
 tower-http = { version = "0.6.5", features = ["trace"] }
 leptos = { version = "0.6", features = ["ssr"] }
 serde = { version = "1.0", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
 lazy_static = { version = "1.4" }
 local-ip-address = { version = "0.6" }
-hyper = { workspace = true }
+hyper = { version = "1.1" }
 
 [dev-dependencies]
 axum-test = { version = "16.2.0" }
-http-body-util = { workspace = true }
+http-body-util = { version = "0.1" }
 tower = { version = "0.5.1" }
