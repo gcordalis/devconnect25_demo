@@ -141,10 +141,8 @@ async fn handle_socket(socket: WebSocket, globals: ServerGlobals, socket_type: S
         SocketType::Verifier => {
             let domain = globals
                 .server_uri
-                .authority()
-                .ok_or_else(|| error!("Failed to extract domain from server URI"))
-                .unwrap()
-                .host();
+                .host()
+                .expect("Failed to extract domain from server URI");
 
             let result = verifier(stream, domain).await;
             handle_operation_result(result, "Verification", |(sent, received)| {
