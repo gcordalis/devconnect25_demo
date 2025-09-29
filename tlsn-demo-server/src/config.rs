@@ -7,6 +7,8 @@ pub const MAX_SENT_DATA: usize = 2048;
 /// Maximum number of bytes that can be received by prover from server
 pub const MAX_RECV_DATA: usize = 4096;
 
+pub const DOMAIN: &str = "swissbank.tlsnotary.org";
+
 /// Default server configuration
 pub struct Config {
     pub ws_host: String,       // Address for WebSocket server
@@ -20,7 +22,7 @@ impl Default for Config {
         Self {
             ws_host: "0.0.0.0".into(),
             ws_port: 9816,
-            server_uri: "https://test-server.io:3000/balances"
+            server_uri: format!("https://{}/balances", DOMAIN)
                 .parse::<Uri>()
                 .unwrap(),
             wstcp_proxy_port: 55688,

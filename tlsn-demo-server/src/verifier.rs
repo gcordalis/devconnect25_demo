@@ -5,7 +5,6 @@ use tlsn::{
     connection::ServerName,
     verifier::{Verifier, VerifierConfig, VerifierOutput, VerifyConfig},
 };
-use tlsn_server_fixture_certs::{CA_CERT_DER, SERVER_DOMAIN};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::compat::TokioAsyncReadCompatExt;
 use tracing::{debug, info};
@@ -25,9 +24,6 @@ pub async fn verifier<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
         .unwrap();
 
     let verifier_config = VerifierConfig::builder()
-        .root_store(RootCertStore {
-            roots: vec![CertificateDer(CA_CERT_DER.to_vec())],
-        })
         .protocol_config_validator(config_validator)
         .build()
         .unwrap();

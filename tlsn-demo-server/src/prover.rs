@@ -12,11 +12,7 @@ use spansy::{
 use crate::config::{MAX_RECV_DATA, MAX_SENT_DATA};
 use tlsn::connection::ServerName;
 use tlsn::prover::{ProveConfig, ProveConfigBuilder, Prover, ProverConfig};
-use tlsn::{
-    config::{CertificateDer, PrivateKeyDer, ProtocolConfig, RootCertStore},
-    prover::TlsConfig,
-};
-use tlsn_server_fixture_certs::{CA_CERT_DER, CLIENT_CERT_DER, CLIENT_KEY_DER, SERVER_DOMAIN};
+use tlsn::{config::ProtocolConfig, prover::TlsConfig};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::{debug, info};
@@ -34,23 +30,12 @@ pub async fn prover<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     // Create a root certificate store with the server-fixture's self-signed
     // certificate. This is only required for offline testing with the
     // server-fixture.
-    let mut tls_config_builder = TlsConfig::builder();
-    tls_config_builder
-        .root_store(RootCertStore {
-            roots: vec![CertificateDer(CA_CERT_DER.to_vec())],
-        })
-        // (Optional) Set up TLS client authentication if required by the server.
-        .client_auth((
-            vec![CertificateDer(CLIENT_CERT_DER.to_vec())],
-            PrivateKeyDer(CLIENT_KEY_DER.to_vec()),
-        ));
-
+    let tls_config_builder = TlsConfig::builder();
     let tls_config = tls_config_builder.build().unwrap();
 
     // Create prover and connect to verifier.
     let prover_config = ProverConfig::builder()
-        .server_name(ServerName::Dns(SERVER_DOMAIN.try_into().unwrap()))
-        //         .server_name(ServerName::Dns(server_domain.try_into().unwrap()))
+        .server_name(ServerName::Dns(server_domain.try_into().unwrap()))
         .tls_config(tls_config)
         .protocol_config(
             ProtocolConfig::builder()

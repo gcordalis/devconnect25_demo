@@ -1,7 +1,6 @@
 [workspace]
 members = [
-    "server-fixture/certs",
-    "server-fixture/server",
+    "swissbank",
     "tlsn-demo-server",
 ]
 resolver = "2"
@@ -14,8 +13,6 @@ resolver = "2"
 
 
 [workspace.dependencies]
-
-tlsn-server-fixture-certs = { path = "server-fixture/certs" }
 
 axum = { version = "0.8" }
 anyhow = { version = "1.0" }

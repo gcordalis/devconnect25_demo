@@ -1,6 +1,6 @@
 use std::{
     net::SocketAddr,
-    sync::{Arc, Mutex, RwLock},
+    sync::{Arc, RwLock},
 };
 
 use axum::{
@@ -15,56 +15,19 @@ use lazy_static::lazy_static;
 use leptos::*;
 use tower_http::trace::TraceLayer;
 
-use futures::{channel::oneshot, AsyncRead, AsyncWrite};
-use futures_rustls::{
-    pki_types::{CertificateDer, PrivateKeyDer},
-    rustls::{server::WebPkiClientVerifier, RootCertStore, ServerConfig},
-    TlsAcceptor,
-};
-use hyper::{body::Incoming, server::conn::http1, StatusCode};
-use hyper_util::rt::TokioIo;
+use hyper::StatusCode;
+use tokio::net::TcpListener;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tokio_util::compat::FuturesAsyncReadCompatExt;
-use tower_service::Service;
 
 use axum::extract::FromRequest;
 use hyper::header;
 
-use tlsn_server_fixture_certs::*;
 use tracing::info;
 
-pub const DEFAULT_FIXTURE_PORT: u16 = 443;
-
-#[derive(serde::Serialize)]
-struct Balances {
-    bank: &'static str,
-    organization: &'static str,
-    accounts: Accounts,
-    last_audit: &'static str,
-    auditor: &'static str,
-}
-
-#[derive(serde::Serialize)]
-struct Accounts {
-    EUR: u64,
-    USD: u64,
-    CHF: u64,
-}
-
-const EF_BALANCE: Balances = Balances {
-    bank: "Swiss Bank",
-    organization: "Ethereum Foundation",
-    accounts: Accounts {
-        EUR: 275_000_000,
-        USD: 125_000_000,
-        CHF: 50_000_000,
-    },
-    last_audit: "2025-11-12T12:00:00Z",
-    auditor: "PwC",
-};
+pub const DEFAULT_FIXTURE_PORT: u16 = 3000;
 
 fn get_local_ip() -> String {
     if let Ok(ip) = local_ip_address::local_ip() {
@@ -86,9 +49,7 @@ pub struct LogEntry {
     pub message: String,
 }
 
-struct AppState {
-    shutdown: Option<oneshot::Sender<()>>,
-}
+// Removed AppState struct - not needed for simple HTTP server
 
 // Helper function to add logs to global storage
 fn add_to_global_log(message: String) {
@@ -107,77 +68,36 @@ fn add_to_global_log(message: String) {
     }
 }
 
-fn app(state: AppState) -> Router {
-    let state_arc = Arc::new(Mutex::new(state));
-
+fn app() -> Router {
     Router::new()
         .route("/", get(dashboard_handler))
         .route("/balances", get(balances_route))
         .layer(middleware::from_fn(access_log_middleware))
         .layer(TraceLayer::new_for_http())
-        .with_state(state_arc)
 }
 
-/// Bind the server to the given socket with remote address info.
-pub async fn bind_with_addr<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
-    socket: T,
-    remote_addr: SocketAddr,
-) -> anyhow::Result<()> {
-    // Add a test log entry on startup
-    let key = PrivateKeyDer::Pkcs8(SERVER_KEY_DER.into());
-    let cert = CertificateDer::from(SERVER_CERT_DER);
+/// Start the HTTP server
+pub async fn serve() -> anyhow::Result<()> {
+    let addr = std::env::var("ADDR").unwrap_or_else(|_| "0.0.0.0".to_string());
+    let port = std::env::var("PORT")
+        .map(|port| port.parse().unwrap())
+        .unwrap_or_else(|_| DEFAULT_FIXTURE_PORT);
 
-    // Set up a client certificate verifier.
-    let mut root_store = RootCertStore::empty();
-    root_store.add(CA_CERT_DER.into()).unwrap();
-    let client_cert_verifier = WebPkiClientVerifier::builder(root_store.into())
-        .allow_unauthenticated()
-        .build()
-        .unwrap();
+    let listener = TcpListener::bind((addr.as_str(), port)).await?;
+    info!("Starting HTTP server on {}:{}", addr, port);
 
-    let config = ServerConfig::builder()
-        .with_client_cert_verifier(client_cert_verifier)
-        .with_single_cert(vec![cert], key)
-        .unwrap();
+    let app = app();
 
-    let acceptor = TlsAcceptor::from(Arc::new(config));
-
-    let conn = acceptor.accept(socket).await?;
-
-    let io = TokioIo::new(conn.compat());
-
-    let (sender, receiver) = oneshot::channel();
-    let state = AppState {
-        shutdown: Some(sender),
-    };
-    let tower_service = app(state);
-
-    // Create a service that includes socket information in requests
-    let hyper_service = hyper::service::service_fn(move |mut request: Request<Incoming>| {
-        // Insert the actual remote address into the request extensions
-        request.extensions_mut().insert(ConnectInfo(remote_addr));
-
-        tower_service.clone().call(request)
-    });
-
-    tokio::select! {
-        _ = http1::Builder::new()
-                .keep_alive(false)
-                .serve_connection(io, hyper_service) => {},
-        _ = receiver => {},
-    }
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await?;
 
     Ok(())
 }
 
-/// Bind the server to the given socket.
-pub async fn bind<T: AsyncRead + AsyncWrite + Send + Unpin + 'static>(
-    socket: T,
-) -> anyhow::Result<()> {
-    // Fallback for when remote address is not available
-    let placeholder_addr = SocketAddr::from(([127, 0, 0, 1], 0));
-    bind_with_addr(socket, placeholder_addr).await
-}
+// Removed old bind function - using axum::serve now
 
 async fn access_log_middleware(
     req: Request<axum::body::Body>,
@@ -261,6 +181,10 @@ async fn balances_route(
     _: AuthenticatedUser,
 ) -> Result<Json<Value>, StatusCode> {
     info!("Balances accessed from: {}", addr);
+    get_bank_data()
+}
+
+fn get_bank_data() -> Result<Json<Value>, StatusCode> {
     get_json_value(include_str!("data/swissbankdata.json"))
 }
 
@@ -275,7 +199,8 @@ async fn dashboard_handler() -> Html<String> {
 
 #[component]
 pub fn App(#[prop(default = "localhost:3000".to_string())] host: String) -> impl IntoView {
-    let data = serde_json::to_string_pretty(&EF_BALANCE).unwrap();
+    let data = get_bank_data().unwrap();
+    let data = serde_json::to_string_pretty(&*data).unwrap();
     view! {
         <html lang="en">
             <head>
@@ -405,7 +330,7 @@ pub fn App(#[prop(default = "localhost:3000".to_string())] host: String) -> impl
                     </div>
 
                     <div class="footer">
-                        <p>"Try it yourself: " <code>{format!("https://{}/balances", host)}</code></p>
+                        <p>"Try it yourself: " <code>{format!("http://{}/balances", host)}</code></p>
                     </div>
                 </div>
             </body>

@@ -29,7 +29,6 @@ uuid = { version = "1.4.1", features = ["v4", "fast-rng"] }
 ws_stream_tungstenite = { version = "0.13", features = ["tokio_io"] }
 
 tlsn = { git = "https://github.com/tlsnotary/tlsn.git", branch = "dev" }
-tlsn-server-fixture-certs = { workspace = true }
 spansy = { git = "https://github.com/tlsnotary/tlsn-utils", package = "spansy", branch = "dev" }
 rangeset = "0.2.0"
 tower-util = "0.3.1"
