@@ -19,7 +19,7 @@ root.render(<App />);
 let capturedLogs: string[] = [];
 const originalLog = console.log;
 
-const serverUrl = 'https://0.0.0.0/balances';
+const serverUrl = 'https://swissbank.tlsnotary.org/balances';
 // const websocketProxyUrl = `wss://notary.pse.dev/proxy`;
 const proverProxyUrl = 'ws://localhost:9816/prove';
 

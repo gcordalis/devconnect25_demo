@@ -1,0 +1,21 @@
+services:
+  swissbank-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: swissbank-server
+    expose:
+      - "3000"
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:latest
+    container_name: caddy
+    ports:
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./certs:/certs:ro
+    depends_on:
+      - swissbank-server
+    restart: unless-stopped

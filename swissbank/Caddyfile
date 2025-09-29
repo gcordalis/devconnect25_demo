@@ -1,0 +1,4 @@
+swissbank.tlsnotary.org {
+	tls /certs/fullchain.pem /certs/privkey.pem
+	reverse_proxy swissbank-server:3000
+}

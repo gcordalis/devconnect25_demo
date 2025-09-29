@@ -1,7 +1,7 @@
 use crate::config::{MAX_RECV_DATA, MAX_SENT_DATA};
 use eyre::eyre;
 use tlsn::{
-    config::{CertificateDer, ProtocolConfigValidator, RootCertStore},
+    config::ProtocolConfigValidator,
     connection::ServerName,
     verifier::{Verifier, VerifierConfig, VerifierOutput, VerifyConfig},
 };
