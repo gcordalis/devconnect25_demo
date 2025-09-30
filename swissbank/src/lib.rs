@@ -232,10 +232,32 @@ pub struct AppProps {
     host: String,
 }
 
+fn redact_json(json_str: &str) -> String {
+    json_str
+        .chars()
+        .map(|c| match c {
+            '0'..='9' => '█',
+            '_' => '█',
+            'a'..='z' | 'A'..='Z' => '█',
+            _ => c,
+        })
+        .collect()
+}
+
 #[component]
 pub fn App(props: AppProps) -> Element {
     let data = get_bank_data().unwrap();
-    let data = serde_json::to_string_pretty(&*data).unwrap();
+    let data_str = serde_json::to_string_pretty(&*data).unwrap();
+    let redacted = redact_json(&data_str);
+
+    let data_escaped = data_str
+        .replace("\\", "\\\\")
+        .replace("`", "\\`")
+        .replace("$", "\\$");
+    let redacted_escaped = redacted
+        .replace("\\", "\\\\")
+        .replace("`", "\\`")
+        .replace("$", "\\$");
 
     rsx! {
         head {
@@ -248,15 +270,18 @@ pub fn App(props: AppProps) -> Element {
         body {
             div { class: "container",
                     div { class: "header",
-                        h1 { "Swiss Bank Demo" }
-                        p { "This server holds EF's (fake) reserves. Only the EF has access." }
+                        h1 { "TLSNotary Swiss Bank Demo" }
+                        p { "This demo server holds the EF's (fake) cash reserves." }
+                        p { "Only the EF has the authentication token to access the data" }
+
                     }
 
                     div { class: "section",
                         h2 { "Bank Reserves" }
                         pre {
-                            code { "{data}" }
+                            code { id: "bank-data", "{redacted}" }
                         }
+                        p { style: "font-size: 0.9em; font-style: italic; color: #666; margin-top: 10px;", "(Hold 'S' to reveal data)" }
                     }
 
                     div { class: "section",
@@ -275,14 +300,31 @@ pub fn App(props: AppProps) -> Element {
                             }
                         }
                     }
-
-                div { class: "footer",
-                    p {
-                        "Try it yourself: "
-                        code { "http://{props.host}/balances" }
-                    }
-                }
             }
+            script { dangerous_inner_html: "
+                (function() {{
+                    const realData = `{data_escaped}`;
+                    const redactedData = `{redacted_escaped}`;
+
+                    document.addEventListener('keydown', function(event) {{
+                        if (event.key === 's' || event.key === 'S') {{
+                            const codeElement = document.getElementById('bank-data');
+                            if (codeElement) {{
+                                codeElement.textContent = realData;
+                            }}
+                        }}
+                    }});
+
+                    document.addEventListener('keyup', function(event) {{
+                        if (event.key === 's' || event.key === 'S') {{
+                            const codeElement = document.getElementById('bank-data');
+                            if (codeElement) {{
+                                codeElement.textContent = redactedData;
+                            }}
+                        }}
+                    }});
+                }})();
+            " }
         }
     }
 }
