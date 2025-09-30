@@ -319,27 +319,29 @@ pub fn App(props: AppProps) -> Element {
 
                     }
 
-                    div { class: "section",
-                        h2 { "Bank Reserves" }
-                        pre {
-                            code { id: "bank-data", "{redacted}" }
-                        }
-                        p { style: "font-size: 0.9em; font-style: italic; color: #666; margin-top: 10px;", "(Hold 'S' to reveal data)" }
-                    }
-
-                    div { class: "section",
-                        h2 { "Live Access Log" }
-                        table { class: "log-table",
-                            thead {
-                                tr {
-                                    th { style: "width: 120px;", "Time" }
-                                    th { "Activity" }
-                                }
+                    div { class: "content-grid",
+                        div { class: "section",
+                            h2 { "Bank Reserves" }
+                            pre {
+                                code { id: "bank-data", "{redacted}" }
                             }
-                            tbody {
-                                "hx-get": "/logs-html",
-                                "hx-trigger": "load, every 2s",
-                                "hx-swap": "innerHTML"
+                            p { style: "font-size: 0.9em; font-style: italic; color: #666; margin-top: 10px;", "(Hold 'S' to reveal data)" }
+                        }
+
+                        div { class: "section",
+                            h2 { "Live Access Log" }
+                            table { class: "log-table",
+                                thead {
+                                    tr {
+                                        th { style: "width: 120px;", "Time" }
+                                        th { "Activity" }
+                                    }
+                                }
+                                tbody {
+                                    "hx-get": "/logs-html",
+                                    "hx-trigger": "load, every 2s",
+                                    "hx-swap": "innerHTML"
+                                }
                             }
                         }
                     }

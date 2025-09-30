@@ -39,6 +39,24 @@ body {
     border-radius: 10px;
 }
 
+.content-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+}
+
+@media (min-width: 1024px) {
+    .content-grid {
+        flex-direction: row;
+        align-items: flex-start;
+    }
+
+    .content-grid .section {
+        flex: 1;
+        margin: 0;
+    }
+}
+
 .section h2 {
     font-size: 2.5rem;
     margin-top: 0;
