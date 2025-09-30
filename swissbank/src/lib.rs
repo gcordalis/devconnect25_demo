@@ -69,7 +69,8 @@ fn add_to_global_log(message: String) {
 
 fn app() -> Router {
     Router::new()
-        .route("/", get(dashboard_handler))
+        .route("/", get(home_handler))
+        .route("/dashboard", get(dashboard_handler))
         .route("/balances", get(balances_route))
         .route("/logs", get(logs_endpoint))
         .route("/logs-html", get(logs_html_endpoint))
@@ -216,6 +217,13 @@ async fn logs_endpoint() -> Json<Vec<LogEntry>> {
     Json(logs.clone())
 }
 
+async fn home_handler() -> Html<String> {
+    let mut vdom = VirtualDom::new(HomePage);
+    vdom.rebuild_in_place();
+    let html = dioxus_ssr::render(&vdom);
+    Html(html)
+}
+
 async fn dashboard_handler() -> Html<String> {
     let local_ip = get_local_ip();
     let port = std::env::var("PORT").unwrap_or_else(|_| DEFAULT_FIXTURE_PORT.to_string());
@@ -242,6 +250,41 @@ fn redact_json(json_str: &str) -> String {
             _ => c,
         })
         .collect()
+}
+
+#[component]
+pub fn HomePage() -> Element {
+    rsx! {
+        head {
+            meta { charset: "utf-8" }
+            meta { name: "viewport", content: "width=device-width, initial-scale=1" }
+            title { "Swiss Bank Demo" }
+            style { dangerous_inner_html: DASHBOARD_CSS }
+        }
+        body { class: "home-body",
+            div { class: "home-container",
+                h1 { "TLSNotary Swiss Bank Demo" }
+                div { class: "description",
+                    p { "This is a demonstration of TLSNotary technology using a simulated Swiss bank scenario. The bank's reserves are protected behind an authentication token, demonstrating how TLSNotary can verify private API data without revealing credentials." }
+                    p { "Use the dashboard to monitor access attempts in real-time and see how authenticated requests reveal the bank data." }
+                }
+                div { class: "links",
+                    a { class: "link-item", href: "/dashboard",
+                        div { class: "link-title", "Dashboard" }
+                        div { class: "link-desc", "View the live access log and bank reserves" }
+                    }
+                    a { class: "link-item", href: "/balances",
+                        div { class: "link-title", "Balances" }
+                        div { class: "link-desc", "Access bank balances (requires authentication)" }
+                    }
+                    a { class: "link-item", href: "/logs",
+                        div { class: "link-title", "Logs" }
+                        div { class: "link-desc", "View access logs in JSON format" }
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[component]
