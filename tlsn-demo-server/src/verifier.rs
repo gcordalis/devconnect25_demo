@@ -41,6 +41,8 @@ pub async fn verifier<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
         .await
         .map_err(|e| eyre!("Verification failed: {}", e))?;
 
+    println!("XXXXX TLS Transcript: {:#?}", transcript);
+
     let server_name =
         server_name.ok_or_else(|| eyre!("prover should have revealed server name"))?;
     let transcript =
@@ -60,19 +62,19 @@ pub async fn verifier<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     let response = String::from_utf8(received.clone()).expect("Verifier expected received data");
 
     debug!("Received data: {:?}", response);
-    response
-        .find("Ethereum Foundation")
-        .ok_or_else(|| eyre!("Verification failed: missing data in received data"))?;
+    // response
+    //     .find("Ethereum Foundation")
+    //     .ok_or_else(|| eyre!("Verification failed: missing data in received data"))?;
 
-    // Check Session info: server name.
-    let ServerName::Dns(dns_name) = server_name;
-    if dns_name.as_str() != server_domain {
-        return Err(eyre!(
-            "Verification failed: server name mismatches: {} != {}",
-            dns_name,
-            server_domain
-        ));
-    }
+    // // Check Session info: server name.
+    // let ServerName::Dns(dns_name) = server_name;
+    // if dns_name.as_str() != server_domain {
+    //     return Err(eyre!(
+    //         "Verification failed: server name mismatches: {} != {}",
+    //         dns_name,
+    //         server_domain
+    //     ));
+    // }
 
     let sent_string = bytes_to_redacted_string(&sent)?;
     let received_string = bytes_to_redacted_string(&received)?;

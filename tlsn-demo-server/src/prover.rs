@@ -10,9 +10,9 @@ use spansy::{
 };
 
 use crate::config::{MAX_RECV_DATA, MAX_SENT_DATA};
+use tlsn::config::ProtocolConfig;
 use tlsn::connection::ServerName;
 use tlsn::prover::{ProveConfig, ProveConfigBuilder, Prover, ProverConfig};
-use tlsn::{config::ProtocolConfig, prover::TlsConfig};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::{debug, info};
@@ -27,16 +27,9 @@ pub async fn prover<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     let server_domain = server_uri.authority().unwrap().host();
     let server_port = server_uri.port_u16().unwrap_or(443);
 
-    // Create a root certificate store with the server-fixture's self-signed
-    // certificate. This is only required for offline testing with the
-    // server-fixture.
-    let tls_config_builder = TlsConfig::builder();
-    let tls_config = tls_config_builder.build().unwrap();
-
     // Create prover and connect to verifier.
     let prover_config = ProverConfig::builder()
         .server_name(ServerName::Dns(server_domain.try_into().unwrap()))
-        .tls_config(tls_config)
         .protocol_config(
             ProtocolConfig::builder()
                 .max_sent_data(MAX_SENT_DATA)
@@ -80,7 +73,7 @@ pub async fn prover<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
         .uri(server_uri.clone())
         .header("Host", server_domain)
         .header("Connection", "close")
-        .header(header::AUTHORIZATION, "Bearer random_auth_token")
+        // .header(header::AUTHORIZATION, "Bearer random_auth_token")
         .method("GET")
         .body(Empty::<Bytes>::new())
         .unwrap();
@@ -91,6 +84,11 @@ pub async fn prover<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
 
     // Create proof for the Verifier.
     let mut prover = prover_task.await.unwrap().unwrap();
+
+    info!(
+        "server signature: {:?}",
+        prover.tls_transcript().server_signature().unwrap().scheme,
+    );
 
     let mut builder: ProveConfigBuilder<'_> = ProveConfig::builder(prover.transcript());
 
@@ -113,26 +111,56 @@ pub async fn prover<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
 
 /// Redacts and reveals received data to the verifier.
 fn redact_and_reveal_received_data(recv_transcript: &[u8]) -> RangeSet<usize> {
-    // Get the some information from the received data.
-    let received_string = String::from_utf8(recv_transcript.to_vec()).unwrap();
-    debug!("Received data: {}", received_string);
-    let resp = parse_response(recv_transcript).unwrap();
-    let body = resp.body.unwrap();
-    let mut json = json::parse_slice(body.as_bytes()).unwrap();
-    json.offset(body.content.span().indices().min().unwrap());
+    // Parse and log the received data
+    if let Ok(received_string) = std::str::from_utf8(recv_transcript) {
+        debug!("Received data: {}", received_string);
+    }
 
-    let name = json
-        .get("organization")
-        .expect("organization field not found");
+    // Parse response and extract JSON body
+    let resp = parse_response(recv_transcript).expect("Failed to parse HTTP response");
+    let body = resp.body.expect("Response body not found");
+    let mut json = json::parse_slice(body.as_bytes()).expect("Failed to parse JSON");
 
-    let street = json.get("bank").expect("bank field not found");
+    let body_offset = body
+        .content
+        .span()
+        .indices()
+        .min()
+        .expect("Failed to get body content offset");
+    json.offset(body_offset);
 
-    let name_start = name.span().indices().min().unwrap() - 9; // 9 is the length of "name: "
-    let name_end = name.span().indices().max().unwrap() + 1; // include `"`
-    let street_start = street.span().indices().min().unwrap() - 11; // 11 is the length of "street: "
-    let street_end = street.span().indices().max().unwrap() + 1; // include `"`
+    // Extract required JSON fields
+    let fields = [
+        ("organization", "\"organization\": \""),
+        ("bank", "\"bank\": \""),
+        ("accounts.USD", "\"USD\": \""),
+        ("accounts.EUR", "\"EUR\": \""),
+        ("accounts.CHF", "\"CHF\": \""),
+    ];
 
-    [name_start..name_end + 1, street_start..street_end + 1].into()
+    // Create ranges for each field
+    let ranges: Vec<_> = fields
+        .iter()
+        .map(|(path, prefix)| {
+            let field = json
+                .get(path)
+                .unwrap_or_else(|| panic!("{} field not found", path));
+
+            let span_indices = field.span().indices();
+            let start = span_indices
+                .min()
+                .expect("Failed to get field start position")
+                - prefix.len();
+            let end = span_indices
+                .max()
+                .expect("Failed to get field end position")
+                + 2; // include closing quote and next char
+
+            start..end
+        })
+        .collect();
+
+    ranges.into()
 }
 
 /// Redacts and reveals sent data to the verifier.
@@ -145,22 +173,22 @@ fn redact_and_reveal_sent_data(sent_transcript: &[u8]) -> RangeSet<usize> {
 
     let req = reqs.first().ok_or("No requests found").unwrap();
 
-    let authorization_header = req
-        .headers_with_name(header::AUTHORIZATION.as_str())
-        .next()
-        .expect("Authorization header not found");
+    // let authorization_header = req
+    //     .headers_with_name(header::AUTHORIZATION.as_str())
+    //     .next()
+    //     .expect("Authorization header not found");
 
-    let start_pos = authorization_header
-        .span()
-        .indices()
-        .min()
-        .expect("Could not find authorization header start position")
-        + header::AUTHORIZATION.as_str().len()
-        + 2;
-    let end_pos =
-        start_pos + authorization_header.span().len() - header::AUTHORIZATION.as_str().len() - 2;
+    // let start_pos = authorization_header
+    //     .span()
+    //     .indices()
+    //     .min()
+    //     .expect("Could not find authorization header start position")
+    //     + header::AUTHORIZATION.as_str().len()
+    //     + 2;
+    // let end_pos =
+    //     start_pos + authorization_header.span().len() - header::AUTHORIZATION.as_str().len() - 2;
 
     // Reveal everything except for the SECRET.
-    // [0..sent_transcript_len].into()
-    [0..start_pos, end_pos..sent_transcript_len].into()
+    //     [0..start_pos, end_pos..sent_transcript_len].into()
+    [0..sent_transcript_len].into()
 }
