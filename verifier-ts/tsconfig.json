@@ -21,6 +21,7 @@
   },
   "include": [
     "src/app.tsx",
-    "src/worker.ts"
+    "src/worker.ts",
+    "src/types.d.ts"
   ]
 }

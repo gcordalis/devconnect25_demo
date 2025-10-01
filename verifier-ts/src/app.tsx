@@ -5,6 +5,7 @@ import { Watch } from 'react-loader-spinner';
 import { Verifier as TVerifier } from 'tlsn-wasm';
 import './app.scss';
 import { HTTPParser } from 'http-parser-js';
+import OverviewDiagram from './overview_prover_verifier.svg';
 
 const { init, Verifier }: any = Comlink.wrap(
   new Worker(new URL('./worker.ts', import.meta.url)),
@@ -114,87 +115,68 @@ function App(): ReactElement {
   return (
     <div className="min-h-screen flex flex-col bg-slate-100">
       <div className="w-full p-4 bg-slate-800 text-white flex-shrink-0 shadow-md">
-        <h1 className="text-xl font-bold">TLSNotary Interactive Verifier Demo</h1>
-        <span className="text-sm mt-1">
-          Interactive Verifier Demo
-        </span>
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold">TLSNotary Devconnect Demo</h1>
+          <a
+            href="https://github.com/tlsnotary/devconnect25_demo"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center space-x-2 text-gray-300 hover:text-white transition-colors duration-200 group"
+            title="View source on GitHub"
+          >
+            <svg
+              className="w-6 h-6 group-hover:scale-110 transition-transform duration-200"
+              fill="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+            </svg>
+            <span className="text-sm font-medium">Source</span>
+          </a>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 p-4 flex-grow">
         <div className="flex flex-col bg-white rounded-lg shadow-md border border-gray-200 p-4">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Demo Controls</h2>
+          <p>TODO introduction</p>
 
           <div className="text-center text-gray-700 mb-6">
-            <p>
-              Before clicking the <span className="font-semibold">Verify</span>{' '}
-              button, make sure the <i>interactive Prover Server</i> is running.
-            </p>
-            <p>
-              Check the{' '}
-              <a href="README.md" className="text-blue-600 hover:underline">
-                README
-              </a>{' '}
-              for the details.
-            </p>
-            <table className="text-left table-auto w-full mt-4">
-              <thead>
-                <tr>
-                  <th className="px-4 py-2 text-left">Demo Settings</th>
-                  <th className="px-4 py-2 text-left">URL</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="border px-4 py-2">Server</td>
-                  <td className="border px-4 py-2">{serverUrl}</td>
-                </tr>
-                <tr>
-                  <td className="border px-4 py-2">Prover</td>
-                  <td className="border px-4 py-2">{proverProxyUrl}</td>
-                </tr>
-                <tr>
-                  <td className="border px-4 py-2">Verifier</td>
-                  <td className="border px-4 py-2">This browser</td>
-                </tr>
-              </tbody>
-            </table>
+            {/* Architecture Overview Diagram */}
+            <div className="my-6 flex justify-center">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-3 text-center">Demo Overview</h3>
+                <OverviewDiagram />
+              </div>
+            </div>
           </div>
 
-          <button
-            onClick={!processing && ready ? onClick : undefined}
-            disabled={processing || !ready}
-            className={`px-6 py-2 rounded-lg font-medium text-white mb-4
-              ${processing || !ready ? 'bg-slate-400 cursor-not-allowed' : 'bg-slate-600 hover:bg-slate-700'}
-            `}
-          >
-            {ready ? 'Verify Prover Server' : 'Initializing...'}
-          </button>
-
-          <div className="w-full text-center">
-            <b className="text-lg font-medium text-gray-800">Verified data: </b>
-            {!processing && !result ? (
-              <i className="text-gray-500">Not started yet</i>
-            ) : !result ? (
-              <div className="flex flex-col items-center justify-center">
-                <p className="text-gray-700 mb-2">Verifying data from Prover...</p>
-                <Watch
-                  visible={true}
-                  height="40"
-                  width="40"
-                  radius="48"
-                  color="#4A5568"
-                  ariaLabel="watch-loading"
-                  wrapperStyle={{}}
-                  wrapperClass=""
-                />
-              </div>
-            ) : (
-              <div className="bg-gray-100 border border-gray-300 p-4 rounded-lg mt-4">
-                <pre data-testid="proof-data" className="text-left text-sm text-gray-800 whitespace-pre-wrap overflow-auto">
-                  {result}
-                </pre>
-              </div>
-            )}
+          <div className="text-center">
+            <button
+              onClick={!processing && ready ? onClick : undefined}
+              disabled={processing || !ready}
+              className={`
+                inline-block px-6 py-3 rounded-xl font-semibold text-white mb-6 text-lg
+                transition-all duration-200 ease-in-out transform
+                shadow-lg hover:shadow-xl
+                ${processing || !ready
+                  ? 'bg-gray-400 cursor-not-allowed opacity-70'
+                  : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 hover:scale-105 active:scale-95 hover:-translate-y-0.5'
+                }
+                focus:outline-none focus:ring-4 focus:ring-blue-300 focus:ring-opacity-50
+                border-0 relative overflow-hidden
+              `}
+            >
+              <span className="relative z-10 flex items-center justify-center space-x-2">
+                {processing && (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                )}
+                <span>{ready ? 'Verify Prover Server' : 'Initializing...'}</span>
+              </span>
+              {!processing && ready && (
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-blue-500 opacity-0 hover:opacity-20 transition-opacity duration-200"></div>
+              )}
+            </button>
           </div>
 
           {/* Console Log View */}
@@ -212,6 +194,51 @@ function App(): ReactElement {
               ))}
             </div>
           </div>
+
+          <div className="mt-6 mb-4">
+            {result && (
+              <>
+                <h3 className="text-md font-semibold text-gray-800 mb-2">Verified data:</h3>
+                <>
+                  <div className="bg-gray-100 border border-gray-300 p-4 rounded-lg mt-4">
+                    <pre data-testid="proof-data" className="text-left text-sm text-gray-800 whitespace-pre-wrap overflow-auto">
+                      {result}
+                    </pre>
+                  </div>
+                </>
+
+              </>
+            )}
+
+          </div>
+
+          {/* POAP Link Section - Only shown when verification is successful */}
+          {result && (
+            <div className="mt-6 mb-4">
+              <h3 className="text-md font-semibold text-gray-800 mb-2">🎉 Verification Successful!</h3>
+              <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-green-800 font-medium mb-1">Claim your POAP!</p>
+                    <p className="text-green-700 text-sm">
+                      You've successfully verified data using TLSNotary.
+                    </p>
+                  </div>
+                  <a
+                    href="https://poap.gallery/event/your-event-id"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ml-4 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors duration-200 flex items-center space-x-2"
+                  >
+                    <span>🏆</span>
+                    <span>Claim POAP</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+
+
         </div>
       </div>
     </div>

@@ -12,6 +12,7 @@ var fileExtensions = [
   'jpeg',
   'png',
   'gif',
+  'svg',
   'eot',
   'otf',
   'svg',
@@ -38,7 +39,19 @@ var options = {
   module: {
     rules: [
       {
-        test: new RegExp('.(' + fileExtensions.join('|') + ')$'),
+        test: /\.svg$/,
+        use: [
+          {
+            loader: '@svgr/webpack',
+            options: {
+              typescript: true,
+              ext: 'tsx',
+            },
+          },
+        ],
+      },
+      {
+        test: new RegExp('.(' + fileExtensions.filter(ext => ext !== 'svg').join('|') + ')$'),
         type: 'asset/resource',
         exclude: /node_modules/,
       },
@@ -100,7 +113,7 @@ var options = {
     alias: alias,
     extensions: fileExtensions
       .map((extension) => '.' + extension)
-      .concat(['.js', '.jsx', '.ts', '.tsx', '.css']),
+      .concat(['.js', '.jsx', '.ts', '.tsx', '.css', 'svg']),
     fallback: {
       crypto: require.resolve('crypto-browserify'),
       stream: require.resolve('stream-browserify'),
