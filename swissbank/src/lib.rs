@@ -352,7 +352,7 @@ pub fn App(props: AppProps) -> Element {
                     const redactedData = `{redacted_escaped}`;
 
                     document.addEventListener('keydown', function(event) {{
-                        if (event.key === 's' || event.key === 'S'|| event.key === 'a') {{
+                        if (event.key === 's' || event.key === 'S' || event.key === 'a') {{
                             const codeElement = document.getElementById('bank-data');
                             if (codeElement) {{
                                 codeElement.textContent = realData;
@@ -361,7 +361,7 @@ pub fn App(props: AppProps) -> Element {
                     }});
 
                     document.addEventListener('keyup', function(event) {{
-                        if (event.key === 's' || event.key === 'S'|| event.key === 'a') {{
+                        if (event.key === 's' || event.key === 'S' || event.key === 'a') {{
                             const codeElement = document.getElementById('bank-data');
                             if (codeElement) {{
                                 codeElement.textContent = redactedData;
