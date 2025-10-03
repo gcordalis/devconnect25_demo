@@ -7,9 +7,33 @@ import './app.scss';
 import { HTTPParser } from 'http-parser-js';
 import OverviewDiagram from './overview_prover_verifier.svg';
 
-const { init, Verifier }: any = Comlink.wrap(
-  new Worker(new URL('./worker.ts', import.meta.url)),
-);
+// Delay worker creation until needed to avoid HMR issues
+let workerWrapper: any = null;
+
+function getWorker() {
+  if (!workerWrapper) {
+    try {
+      console.log('Creating worker...');
+      const worker = new Worker(new URL('./worker.ts', import.meta.url));
+
+      // Add error handlers
+      worker.onerror = (error) => {
+        console.error('Worker error:', error);
+      };
+
+      worker.onmessageerror = (error) => {
+        console.error('Worker message error:', error);
+      };
+
+      console.log('Worker created successfully');
+      workerWrapper = Comlink.wrap(worker);
+    } catch (error) {
+      console.error('Failed to create worker:', error);
+      throw error;
+    }
+  }
+  return workerWrapper;
+}
 
 const container = document.getElementById('root');
 const root = createRoot(container!);
@@ -20,9 +44,10 @@ root.render(<App />);
 let capturedLogs: string[] = [];
 const originalLog = console.log;
 
-const serverUrl = 'https://swissbank.tlsnotary.org/balances';
+// const serverUrl = 'https://swissbank.tlsnotary.org/balances';
+const serverUrl = "https://raw.githubusercontent.com/tlsnotary/devconnect25_demo/refs/heads/dev/swissbank/src/data/swissbankdata.json"
 // const websocketProxyUrl = `wss://notary.pse.dev/proxy`;
-const proverProxyUrl = 'ws://localhost:9816/prove';
+const proverProxyUrl = 'wss://localhost:8443/prove';
 
 function App(): ReactElement {
   const [ready, setReady] = useState(false);
@@ -48,9 +73,17 @@ function App(): ReactElement {
   // Initialize TLSNotary
   React.useEffect(() => {
     (async () => {
-      await init({ loggingLevel: 'Info' });
+      const { init } = getWorker();
+
+      // Calculate optimal concurrency: min(3, available cores - 1) to avoid hitting browser limits
+      const maxConcurrency = Math.min(3, Math.max(1, (navigator.hardwareConcurrency || 4) - 1));
+
+      await init({
+        loggingLevel: 'Info',
+        hardwareConcurrency: maxConcurrency
+      });
       setReady(true);
-      console.log('TLSNotary initialized and ready');
+      console.log(`🔧 TLSNotary initialized with ${maxConcurrency} threads`);
     })();
   }, []);
 
@@ -62,6 +95,8 @@ function App(): ReactElement {
 
     let verifier: TVerifier;
     try {
+      const { Verifier } = getWorker();
+
       console.log('Setting up Verifier');
       verifier = await new Verifier({
         max_sent_data: 2048,

@@ -1,0 +1,25 @@
+services:
+  # Backend service (tlsn-demo-server)
+  tlsn-demo-server:
+    build: ./tlsn-demo-server
+    ports:
+      - "9816:9816" # WebSocket server port (HTTP)
+      - "9817:9817" # WebSocket server port (HTTPS)
+      - "55688:55688" # wstcp proxy port
+    restart: unless-stopped
+    container_name: tlsn-demo-server
+    environment:
+      - RUST_LOG=info
+
+  # Frontend service (verifier-ts)
+  tlsnotary-demo:
+    build: ./verifier-ts
+    ports:
+      - "8080:80" # HTTP (redirects to HTTPS)
+      - "8443:443" # HTTPS
+    restart: unless-stopped
+    container_name: demo-prover
+    depends_on:
+      - tlsn-demo-server
+    environment:
+      - RUST_LOG=info

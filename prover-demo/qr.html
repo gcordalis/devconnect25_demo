@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>TLSNotary: Ethereum Foundation Bank Balance Demo</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            text-align: center;
+            margin: 2em;
+        }
+
+        .qr {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 1em;
+        }
+
+        .qr-section {
+            margin: 2em 0;
+        }
+
+        .qr {
+            margin-top: 1em;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>TLSNotary: Ethereum Foundation Bank Balance Demo</h1>
+
+    <div class="qr-section">
+        <h2>Step 1: Join the Wi-Fi</h2>
+        <p>Network: <strong>TLSNotary</strong><br>Password: <strong>tlsnotary</strong></p>
+        <div id="wifi-qr" class="qr"></div>
+    </div>
+
+    <div class="qr-section">
+        <h2>Step 2: Open the Verifier Demo</h2>
+        <p>Scan or go to: <br><a href="http://prover-demo.tlsnotary.org">http://prover-demo.tlsnotary.org</a></p>
+        <div id="verifier-qr" class="qr"></div>
+    </div>
+
+    <div class="qr-section">
+        <h2>Step 3</h2>
+        <p>
+            Click the Verify button.
+        </p>
+    </div>
+
+    <div class="qr-section">
+        <h2>More info</h2>
+        <p>
+            This demo shows how TLSNotary can prove statements about data inside
+            a secure TLS session (like balances from a Swiss Bank) without revealing secrets to the verifier.
+        </p>
+    </div>
+
+    <!-- QRCode library -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
+    <script>
+        // QR code payloads
+        const wifiPayload = "WIFI:T:WPA;S:TLSNotary;P:tlsnotary;;";
+        const verifierURL = "http://192.168.8.129";
+
+        new QRCode(document.getElementById("wifi-qr"), {
+            text: wifiPayload,
+            width: 200,
+            height: 200,
+        });
+
+        new QRCode(document.getElementById("verifier-qr"), {
+            text: verifierURL,
+            width: 200,
+            height: 200,
+        });
+    </script>
+</body>
+
+</html>
