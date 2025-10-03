@@ -55,8 +55,8 @@ RUN chown appuser:appuser /app/certs/server.key /app/certs/server.crt
 # Switch to non-root user
 USER appuser
 
-# Expose the ports (9816 for HTTP, 9817 for HTTPS, 55688 for wstcp proxy)
-EXPOSE 9816 9817 55688
+# Expose the ports (9816 for HTTP, 55688 for wstcp proxy)
+EXPOSE 9816 55688
 
 # Run the binary
 CMD ["./tlsn-demo-server"]

@@ -7,33 +7,9 @@ import './app.scss';
 import { HTTPParser } from 'http-parser-js';
 import OverviewDiagram from './overview_prover_verifier.svg';
 
-// Delay worker creation until needed to avoid HMR issues
-let workerWrapper: any = null;
-
-function getWorker() {
-  if (!workerWrapper) {
-    try {
-      console.log('Creating worker...');
-      const worker = new Worker(new URL('./worker.ts', import.meta.url));
-
-      // Add error handlers
-      worker.onerror = (error) => {
-        console.error('Worker error:', error);
-      };
-
-      worker.onmessageerror = (error) => {
-        console.error('Worker message error:', error);
-      };
-
-      console.log('Worker created successfully');
-      workerWrapper = Comlink.wrap(worker);
-    } catch (error) {
-      console.error('Failed to create worker:', error);
-      throw error;
-    }
-  }
-  return workerWrapper;
-}
+const { init, Verifier }: any = Comlink.wrap(
+  new Worker(new URL('./worker.ts', import.meta.url)),
+);
 
 const container = document.getElementById('root');
 const root = createRoot(container!);
@@ -73,8 +49,6 @@ function App(): ReactElement {
   // Initialize TLSNotary
   React.useEffect(() => {
     (async () => {
-      const { init } = getWorker();
-
       // Calculate optimal concurrency: min(3, available cores - 1) to avoid hitting browser limits
       const maxConcurrency = Math.min(3, Math.max(1, (navigator.hardwareConcurrency || 4) - 1));
 
@@ -85,9 +59,7 @@ function App(): ReactElement {
       setReady(true);
       console.log(`🔧 TLSNotary initialized with ${maxConcurrency} threads`);
     })();
-  }, []);
-
-  const onClick = useCallback(async () => {
+  }, []); const onClick = useCallback(async () => {
     setProcessing(true);
     capturedLogs = [];
     setConsoleMessages([]);
@@ -95,8 +67,6 @@ function App(): ReactElement {
 
     let verifier: TVerifier;
     try {
-      const { Verifier } = getWorker();
-
       console.log('Setting up Verifier');
       verifier = await new Verifier({
         max_sent_data: 2048,
