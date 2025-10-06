@@ -1,6 +1,6 @@
-# verifier-server
+# Prover Server
 
-An implementation of the interactive verifier server in Rust.
+WebSocket server that acts as the TLSNotary prover in the DevConnect demo.
 
 ## Running the server
 1. Configure this server setting via the global variables defined in [main.rs](./src/main.rs) — please ensure that the hardcoded `SERVER_DOMAIN` has the same value on the prover side.
@@ -10,5 +10,8 @@ cargo run --release
 ```
 
 ## WebSocket APIs
+### /prove
+For prover connections via websocket, i.e. `ws://localhost:9816/prove`
+
 ### /verify
-To perform verification via websocket, i.e. `ws://localhost:9816/verify`
+For verification via websocket, i.e. `ws://localhost:9816/verify`

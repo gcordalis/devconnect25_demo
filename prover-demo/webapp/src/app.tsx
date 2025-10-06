@@ -22,8 +22,8 @@ const originalLog = console.log;
 
 // const serverUrl = 'https://swissbank.tlsnotary.org/balances';
 const serverUrl = "https://raw.githubusercontent.com/tlsnotary/devconnect25_demo/refs/heads/dev/swissbank/src/data/swissbankdata.json"
-// const websocketProxyUrl = `wss://notary.pse.dev/proxy`;
-const proverProxyUrl = 'wss://localhost:8443/prove';
+
+const proverProxyUrl = process.env.PROVER_PROXY_URL || 'ws://localhost:9816/prove';
 
 function App(): ReactElement {
   const [ready, setReady] = useState(false);

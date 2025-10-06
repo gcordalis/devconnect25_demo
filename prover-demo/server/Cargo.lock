@@ -3143,6 +3143,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "server"
+version = "0.1.0"
+dependencies = [
+ "async-std",
+ "async-trait",
+ "async-tungstenite",
+ "axum",
+ "axum-core",
+ "base64 0.21.7",
+ "eyre",
+ "futures",
+ "futures-util",
+ "http",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "rangeset",
+ "regex",
+ "serde",
+ "sha1",
+ "spansy",
+ "tlsn",
+ "tokio",
+ "tokio-util",
+ "tower 0.4.13",
+ "tower-service",
+ "tower-util",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "ws_stream_tungstenite",
+ "wstcp",
+]
+
+[[package]]
 name = "sha-1"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3533,41 +3568,6 @@ dependencies = [
  "serio",
  "thiserror 1.0.69",
  "tokio",
-]
-
-[[package]]
-name = "tlsn-demo-server"
-version = "0.1.0"
-dependencies = [
- "async-std",
- "async-trait",
- "async-tungstenite",
- "axum",
- "axum-core",
- "base64 0.21.7",
- "eyre",
- "futures",
- "futures-util",
- "http",
- "http-body-util",
- "hyper",
- "hyper-util",
- "rangeset",
- "regex",
- "serde",
- "sha1",
- "spansy",
- "tlsn",
- "tokio",
- "tokio-util",
- "tower 0.4.13",
- "tower-service",
- "tower-util",
- "tracing",
- "tracing-subscriber",
- "uuid",
- "ws_stream_tungstenite",
- "wstcp",
 ]
 
 [[package]]

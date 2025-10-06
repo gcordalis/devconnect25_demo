@@ -144,6 +144,9 @@ var options = {
     new webpack.ProvidePlugin({
       Buffer: ['buffer', 'Buffer'],
     }),
+    new webpack.DefinePlugin({
+      'process.env.PROVER_PROXY_URL': JSON.stringify(process.env.PROVER_PROXY_URL || 'ws://localhost:9816/prove'),
+    }),
   ].filter(Boolean),
   // Required by wasm-bindgen-rayon, in order to use SharedArrayBuffer on the Web
   // Ref:

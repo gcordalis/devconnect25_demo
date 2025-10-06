@@ -44,7 +44,7 @@ RUN useradd -r -s /bin/false appuser
 WORKDIR /app
 
 # Copy the binary from builder stage
-COPY --from=builder /app/target/release/tlsn-demo-server /app/tlsn-demo-server
+COPY --from=builder /app/target/release/server /app/server
 
 # Change ownership to appuser (but keep certs readable)
 RUN chown -R appuser:appuser /app
@@ -59,4 +59,4 @@ USER appuser
 EXPOSE 9816 55688
 
 # Run the binary
-CMD ["./tlsn-demo-server"]
+CMD ["./server"]
