@@ -18,7 +18,7 @@ env:
     CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
 
 jobs:
-    build_and_publish_notary_server_image:
+    build_and_publish_swissbank_image:
         name: publish swissbanks's image
         runs-on: ubuntu-latest
         permissions:

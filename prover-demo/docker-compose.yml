@@ -4,7 +4,6 @@ services:
     build: ./server
     ports:
       - "9816:9816" # WebSocket server port (HTTP)
-      - "9817:9817" # WebSocket server port (HTTPS)
       - "55688:55688" # wstcp proxy port
     restart: unless-stopped
     container_name: prover-server
