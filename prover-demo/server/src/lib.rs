@@ -10,10 +10,13 @@ use http::Uri;
 use hyper::{body::Incoming, server::conn::http1};
 use hyper_util::rt::TokioIo;
 use std::{
+    f64::consts::E,
     net::{IpAddr, SocketAddr},
     sync::Arc,
+    time::Duration,
 };
 use tokio::net::TcpListener;
+use tokio::time::timeout;
 use tower_service::Service;
 use tracing::{debug, error, info};
 use ws_stream_tungstenite::WsStream;
@@ -29,6 +32,7 @@ use verifier::verifier;
 #[derive(Clone, Debug)]
 struct ServerGlobals {
     pub server_uri: Uri,
+    pub session_timeout: Duration,
 }
 
 /// Enum to differentiate between prover and verifier socket handling
@@ -63,6 +67,7 @@ pub async fn run_ws_server(config: &config::Config) -> Result<(), eyre::ErrRepor
         )
         .with_state(ServerGlobals {
             server_uri: config.server_uri.clone(),
+            session_timeout: Duration::from_secs(config.session_timeout_secs),
         });
 
     loop {
@@ -114,28 +119,32 @@ async fn ws_handler(
 
 async fn handle_socket(socket: WebSocket, globals: ServerGlobals, socket_type: SocketType) {
     let stream = WsStream::new(socket.into_inner());
+    let session_timeout = globals.session_timeout;
 
     async fn handle_operation_result<T>(
-        result: Result<T, eyre::ErrReport>,
+        result: Result<Result<T, eyre::ErrReport>, tokio::time::error::Elapsed>,
         operation: &str,
         on_success: impl FnOnce(T),
     ) {
         match result {
-            Ok(value) => {
+            Ok(Ok(value)) => {
                 info!("============================================");
                 info!("{} successful!", operation);
                 info!("============================================");
                 on_success(value);
             }
-            Err(err) => {
+            Ok(Err(err)) => {
                 error!("{} failed: {err}", operation);
+            }
+            Err(elapsed) => {
+                error!("{} timed out after {:?}", operation, elapsed);
             }
         }
     }
 
     match socket_type {
         SocketType::Prover => {
-            let result = prover(stream, &globals.server_uri).await;
+            let result = timeout(session_timeout, prover(stream, &globals.server_uri)).await;
             handle_operation_result(result, "Proving", |_| {}).await;
         }
         SocketType::Verifier => {
@@ -146,7 +155,7 @@ async fn handle_socket(socket: WebSocket, globals: ServerGlobals, socket_type: S
                 .unwrap()
                 .host();
 
-            let result = verifier(stream, domain).await;
+            let result = timeout(session_timeout, verifier(stream, domain)).await;
             handle_operation_result(result, "Verification", |(sent, received)| {
                 info!("Successfully verified {}", domain);
                 info!("Verified sent data:\n{}", sent);

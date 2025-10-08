@@ -9,10 +9,11 @@ pub const MAX_RECV_DATA: usize = 4096;
 
 /// Default server configuration
 pub struct Config {
-    pub ws_host: String,       // Address for WebSocket server
-    pub ws_port: u16,          // Port for WebSocket server
-    pub server_uri: Uri,       // URI of the server from which data is proven with TLSNotary
-    pub wstcp_proxy_port: u16, // Port for the wstcp proxy server
+    pub ws_host: String,           // Address for WebSocket server
+    pub ws_port: u16,              // Port for WebSocket server
+    pub server_uri: Uri,           // URI of the server from which data is proven with TLSNotary
+    pub wstcp_proxy_port: u16,     // Port for the wstcp proxy server
+    pub session_timeout_secs: u64, // Maximum duration for a WebSocket session in seconds
 }
 
 impl Default for Config {
@@ -27,6 +28,7 @@ impl Default for Config {
             //     .parse::<Uri>()
             //     .unwrap(),
             wstcp_proxy_port: 55688,
+            session_timeout_secs: 60,
         }
     }
 }

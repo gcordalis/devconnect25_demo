@@ -1,7 +1,7 @@
 use async_tungstenite::{tokio::connect_async_with_config, tungstenite::protocol::WebSocketConfig};
 use eyre::eyre;
-use std::time::Duration;
 use server::{config::Config, prover::prover, run_ws_server, verifier::verifier};
+use std::time::Duration;
 use tokio::time::timeout;
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
