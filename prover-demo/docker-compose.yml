@@ -4,7 +4,7 @@ services:
     build: ./server
     ports:
       - "9816:9816" # WebSocket server port (HTTP)
-      - "55688:55688" # wstcp proxy port
+      # - "55688:55688" # no required for demo
     restart: unless-stopped
     container_name: prover-server
     environment:
@@ -14,7 +14,6 @@ services:
   verifier-webapp:
     build: ./webapp
     ports:
-      - "8080:80" # HTTP (redirects to HTTPS)
       - "8443:443" # HTTPS
     restart: unless-stopped
     container_name: verifier-webapp
