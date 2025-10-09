@@ -21,12 +21,12 @@ impl Default for Config {
         Self {
             ws_host: "0.0.0.0".into(),
             ws_port: 9816,
-            server_uri: format!("https://raw.githubusercontent.com/tlsnotary/devconnect25_demo/refs/heads/dev/swissbank/src/data/swissbankdata.json")
-                .parse::<Uri>()
-                .unwrap(),
-            // server_uri: format!("https://swissbank.tlsnotary.org/balances")
+            // server_uri: format!("https://raw.githubusercontent.com/tlsnotary/devconnect25_demo/refs/heads/dev/swissbank/src/data/swissbankdata.json")
             //     .parse::<Uri>()
             //     .unwrap(),
+            server_uri: format!("https://swissbank.tlsnotary.org/balances")
+                .parse::<Uri>()
+                .unwrap(),
             wstcp_proxy_port: 55688,
             session_timeout_secs: 60,
         }

@@ -28,9 +28,12 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 uuid = { version = "1.4.1", features = ["v4", "fast-rng"] }
 ws_stream_tungstenite = { version = "0.13", features = ["tokio_io"] }
 
-tlsn = { git = "https://github.com/tlsnotary/tlsn.git", branch = "dev" }
+tlsn = { git = "https://github.com/tlsnotary/tlsn.git", branch = "fix/curve_hash_mismatch" }
 spansy = { git = "https://github.com/tlsnotary/tlsn-utils", package = "spansy", branch = "dev" }
 rangeset = "0.2.0"
 tower-util = "0.3.1"
 wstcp = { git = "https://github.com/sile/wstcp.git", version = "0.2.1" }
 async-std = "1.13.2"
+
+[dev-dependencies]
+rstest = "0.26"

@@ -10,7 +10,6 @@ use http::Uri;
 use hyper::{body::Incoming, server::conn::http1};
 use hyper_util::rt::TokioIo;
 use std::{
-    f64::consts::E,
     net::{IpAddr, SocketAddr},
     sync::Arc,
     time::Duration,
@@ -121,16 +120,13 @@ async fn handle_socket(socket: WebSocket, globals: ServerGlobals, socket_type: S
     let stream = WsStream::new(socket.into_inner());
     let session_timeout = globals.session_timeout;
 
-    async fn handle_operation_result<T>(
+    fn handle_operation_result<T>(
         result: Result<Result<T, eyre::ErrReport>, tokio::time::error::Elapsed>,
         operation: &str,
         on_success: impl FnOnce(T),
     ) {
         match result {
             Ok(Ok(value)) => {
-                info!("============================================");
-                info!("{} successful!", operation);
-                info!("============================================");
                 on_success(value);
             }
             Ok(Err(err)) => {
@@ -145,7 +141,7 @@ async fn handle_socket(socket: WebSocket, globals: ServerGlobals, socket_type: S
     match socket_type {
         SocketType::Prover => {
             let result = timeout(session_timeout, prover(stream, &globals.server_uri)).await;
-            handle_operation_result(result, "Proving", |_| {}).await;
+            handle_operation_result(result, "Proving", |_| {});
         }
         SocketType::Verifier => {
             let domain = globals
@@ -160,8 +156,7 @@ async fn handle_socket(socket: WebSocket, globals: ServerGlobals, socket_type: S
                 info!("Successfully verified {}", domain);
                 info!("Verified sent data:\n{}", sent);
                 info!("Verified received data:\n{}", received);
-            })
-            .await;
+            });
         }
     }
 }

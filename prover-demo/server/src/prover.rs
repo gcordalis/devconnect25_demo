@@ -73,7 +73,7 @@ pub async fn prover<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
         .uri(server_uri.clone())
         .header("Host", server_domain)
         .header("Connection", "close")
-        // .header(header::AUTHORIZATION, "Bearer random_auth_token")
+        .header(header::AUTHORIZATION, "Bearer random_auth_token")
         .method("GET")
         .body(Empty::<Bytes>::new())
         .unwrap();
@@ -173,22 +173,21 @@ fn redact_and_reveal_sent_data(sent_transcript: &[u8]) -> RangeSet<usize> {
 
     let req = reqs.first().ok_or("No requests found").unwrap();
 
-    // let authorization_header = req
-    //     .headers_with_name(header::AUTHORIZATION.as_str())
-    //     .next()
-    //     .expect("Authorization header not found");
+    let authorization_header = req
+        .headers_with_name(header::AUTHORIZATION.as_str())
+        .next()
+        .expect("Authorization header not found");
 
-    // let start_pos = authorization_header
-    //     .span()
-    //     .indices()
-    //     .min()
-    //     .expect("Could not find authorization header start position")
-    //     + header::AUTHORIZATION.as_str().len()
-    //     + 2;
-    // let end_pos =
-    //     start_pos + authorization_header.span().len() - header::AUTHORIZATION.as_str().len() - 2;
+    let start_pos = authorization_header
+        .span()
+        .indices()
+        .min()
+        .expect("Could not find authorization header start position")
+        + header::AUTHORIZATION.as_str().len()
+        + 2;
+    let end_pos =
+        start_pos + authorization_header.span().len() - header::AUTHORIZATION.as_str().len() - 2;
 
     // Reveal everything except for the SECRET.
-    //     [0..start_pos, end_pos..sent_transcript_len].into()
-    [0..sent_transcript_len].into()
+    [0..start_pos, end_pos..sent_transcript_len].into()
 }
