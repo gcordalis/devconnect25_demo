@@ -10,6 +10,10 @@ export function initialize(logging_config: LoggingConfig | null | undefined, thr
 export function startSpawner(): Promise<any>;
 export function web_spawn_start_worker(worker: number): void;
 export function web_spawn_recover_spawner(spawner: number): Spawner;
+export type SpanEvent = "New" | "Close" | "Active";
+
+export type LoggingLevel = "Trace" | "Debug" | "Info" | "Warn" | "Error";
+
 export interface CrateLogFilter {
     level: LoggingLevel;
     name: string;
@@ -21,16 +25,36 @@ export interface LoggingConfig {
     span_events: SpanEvent[] | undefined;
 }
 
-export type SpanEvent = "New" | "Close" | "Active";
+export type Body = JsonValue;
 
-export type LoggingLevel = "Trace" | "Debug" | "Info" | "Warn" | "Error";
+export interface Reveal {
+    sent: { start: number; end: number }[];
+    recv: { start: number; end: number }[];
+    server_identity: boolean;
+}
+
+export type NetworkSetting = "Bandwidth" | "Latency";
 
 export interface HttpResponse {
     status: number;
     headers: [string, number[]][];
 }
 
-export type TlsVersion = "V1_2" | "V1_3";
+export interface Commit {
+    sent: { start: number; end: number }[];
+    recv: { start: number; end: number }[];
+}
+
+export interface Transcript {
+    sent: number[];
+    recv: number[];
+}
+
+export interface ConnectionInfo {
+    time: number;
+    version: TlsVersion;
+    transcript_length: TranscriptLength;
+}
 
 export interface HttpRequest {
     uri: string;
@@ -39,25 +63,11 @@ export interface HttpRequest {
     body: Body | undefined;
 }
 
-export type Body = JsonValue;
-
-export interface Transcript {
-    sent: number[];
-    recv: number[];
-}
-
-export interface Commit {
-    sent: { start: number; end: number }[];
-    recv: { start: number; end: number }[];
-}
-
 export interface VerifierOutput {
     server_name: string | undefined;
     connection_info: ConnectionInfo;
     transcript: PartialTranscript | undefined;
 }
-
-export type NetworkSetting = "Bandwidth" | "Latency";
 
 export interface PartialTranscript {
     sent: number[];
@@ -66,23 +76,13 @@ export interface PartialTranscript {
     recv_authed: { start: number; end: number }[];
 }
 
-export type Method = "GET" | "POST" | "PUT" | "DELETE";
+export type TlsVersion = "V1_2" | "V1_3";
 
-export interface ConnectionInfo {
-    time: number;
-    version: TlsVersion;
-    transcript_length: TranscriptLength;
-}
+export type Method = "GET" | "POST" | "PUT" | "DELETE";
 
 export interface TranscriptLength {
     sent: number;
     recv: number;
-}
-
-export interface Reveal {
-    sent: { start: number; end: number }[];
-    recv: { start: number; end: number }[];
-    server_identity: boolean;
 }
 
 export interface ProverConfig {
@@ -187,9 +187,9 @@ export interface InitOutput {
   readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __wbindgen_export_7: WebAssembly.Table;
   readonly __externref_table_dealloc: (a: number) => void;
-  readonly wasm_bindgen__convert__closures_____invoke__h9107c283fb6555e9: (a: number, b: number) => void;
   readonly closure1916_externref_shim: (a: number, b: number, c: any) => void;
-  readonly closure47_externref_shim: (a: number, b: number, c: any) => void;
+  readonly closure45_externref_shim: (a: number, b: number, c: any) => void;
+  readonly wasm_bindgen__convert__closures_____invoke__hcf60a6cf5352d621: (a: number, b: number) => void;
   readonly closure3319_externref_shim: (a: number, b: number, c: any, d: any) => void;
   readonly __wbindgen_thread_destroy: (a?: number, b?: number, c?: number) => void;
   readonly __wbindgen_start: (a: number) => void;

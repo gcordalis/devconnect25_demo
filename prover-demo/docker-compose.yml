@@ -17,6 +17,8 @@ services:
       args:
         PROVER_PROXY_URL: wss://localhost:8443/prove
     restart: unless-stopped
+    ports:
+      - "80:80"
     container_name: verifier-webapp
     depends_on:
       - prover-server

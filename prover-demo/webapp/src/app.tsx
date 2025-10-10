@@ -53,13 +53,15 @@ function App(): ReactElement {
       const maxConcurrency = Math.min(3, Math.max(1, (navigator.hardwareConcurrency || 4) - 1));
 
       await init({
-        loggingLevel: 'Info',
+        loggingLevel: 'Debug',
         hardwareConcurrency: maxConcurrency
       });
       setReady(true);
       console.log(`🔧 TLSNotary initialized with ${maxConcurrency} threads`);
     })();
-  }, []); const onClick = useCallback(async () => {
+  }, []);
+
+  const onClick = useCallback(async () => {
     setProcessing(true);
     capturedLogs = [];
     setConsoleMessages([]);

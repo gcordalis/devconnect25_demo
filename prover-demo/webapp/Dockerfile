@@ -23,6 +23,9 @@ RUN npx webpack --config webpack.js --mode production
 # Production stage - simple nginx to serve static files
 FROM nginx:alpine
 
+# Copy custom nginx configuration
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
 # Copy built files to nginx
 COPY --from=builder /app/build /usr/share/nginx/html
 

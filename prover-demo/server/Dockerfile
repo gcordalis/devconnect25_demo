@@ -59,4 +59,4 @@ USER appuser
 EXPOSE 9816 55688
 
 # Run the binary
-CMD ["./server"]
+CMD ["sh", "-c", "RUST_LOG=Debug ./server"]
