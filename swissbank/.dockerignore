@@ -9,6 +9,15 @@ target/
 *.env
 *.toml.backup
 
+# Ignore Caddy files (not needed for Rust build)
+Caddyfile
+certs/
+
+# Ignore Docker files
+Dockerfile
+docker-compose.yml
+*.md
+
 # Ignore editor files
 *.swp
 *.swo

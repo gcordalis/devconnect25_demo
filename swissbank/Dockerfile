@@ -3,10 +3,18 @@ FROM rust:1.90 as builder
 
 WORKDIR /workspace
 
-# Copy the manifest and source
-COPY . .
+# Copy only the manifest files first (for better caching)
+COPY Cargo.toml Cargo.lock ./
 
-# Build for release
+# Create a dummy main.rs to build dependencies
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN cargo build --release
+RUN rm src/main.rs
+
+# Now copy the actual source code
+COPY src/ ./src/
+
+# Build the final binary
 RUN cargo build --release
 
 # Use a minimal base image for the runtime

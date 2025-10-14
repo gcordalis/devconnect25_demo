@@ -1,4 +1,8 @@
 swissbank.tlsnotary.org {
 	tls /certs/fullchain.pem /certs/privkey.pem
-	reverse_proxy swissbank-server:3000
+	
+	reverse_proxy swissbank-server:3000 {
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Real-IP {remote_host}
+	}
 }

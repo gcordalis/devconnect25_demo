@@ -136,11 +136,27 @@ async fn access_log_middleware(
 ) -> axum::response::Response {
     // Only log requests to /balances
     if req.uri().path() == "/balances" {
+        // Try to get the real client IP from X-Forwarded-For header first (set by reverse proxy)
         let ip = req
-            .extensions()
-            .get::<ConnectInfo<SocketAddr>>()
-            .map(|ConnectInfo(addr)| addr.ip().to_string())
-            .unwrap_or_else(|| "<unknown>".to_string());
+            .headers()
+            .get("x-forwarded-for")
+            .and_then(|value| value.to_str().ok())
+            .and_then(|forwarded| forwarded.split(',').next()) // Take the first IP if multiple
+            .map(|ip| ip.trim().to_string())
+            .or_else(|| {
+                // Fallback to X-Real-IP header
+                req.headers()
+                    .get("x-real-ip")
+                    .and_then(|value| value.to_str().ok())
+                    .map(|ip| ip.to_string())
+            })
+            .unwrap_or_else(|| {
+                // Final fallback to the direct connection IP
+                req.extensions()
+                    .get::<ConnectInfo<SocketAddr>>()
+                    .map(|ConnectInfo(addr)| addr.ip().to_string())
+                    .unwrap_or_else(|| "<unknown>".to_string())
+            });
 
         // Check authorization header
         let is_authorized = req
