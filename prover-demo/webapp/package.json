@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "webpack-dev-server --config webpack.js",
     "build": "webpack --config webpack.js --mode production",
-    "start": "webpack serve --config webpack.js"
+    "start": "webpack serve --config webpack.js",
+    "build:wasm": "sh tlsn-wasm/build.sh dev"
   },
   "author": "",
   "license": "ISC",
